@@ -1,0 +1,5 @@
+bin
+build
+ecs-test
+.ycm_extra_conf.*
+*.sublime-workspace
