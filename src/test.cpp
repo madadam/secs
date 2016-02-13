@@ -1,13 +1,15 @@
 #include <chrono>
 #include <iostream>
 
-#include "entity.h"
 #include "environment.h"
 
 namespace chrono = std::chrono;
 using std::cout;
 using std::endl;
 using std::string;
+
+using secs::Environment;
+using secs::System;
 
 template<typename T>
 void unused(T) {}
@@ -43,8 +45,18 @@ struct Motion {
   float dy = 0;
 };
 
+struct DebugSystem : public System<> {
+  void update(Environment<>& env) override {
+    env.entities<Name, Position>().each([](auto&, auto& name, auto& position) {
+      cout << "name: " << name.name
+           << " position: (" << position.x << ", " << position.y << ")"
+           << endl;
+    });
+  }
+};
+
 int main(int /*argc*/, char** /*argv*/) {
-  Environment env;
+  Environment<> env;
 
   auto a = env.create_entity();
   auto b = env.create_entity();
@@ -58,16 +70,11 @@ int main(int /*argc*/, char** /*argv*/) {
   b.add_component(Motion{ -1, 0 });
   b.add_component(Shape{ 2 });
 
-  for (auto e : env.entities<Name, Position, Motion>()) {
-    auto& name     = e.get_component<Name>();
-    auto& position = e.get_component<Position>();
-    auto& motion   = e.get_component<Motion>();
+  env.emplace_system<DebugSystem>();
+  env.update();
 
-    cout << "name: " << name.name
-         << " position: (" << position.x << ", " << position.y << ")"
-         << " speed: (" << motion.dx << ", " << motion.dy << ")"
-         << endl;
-  }
+  // a.destroy();
+  // a.add_component(Motion{ 0, 0 });
 
   return 0;
 }

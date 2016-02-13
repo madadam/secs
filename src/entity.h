@@ -1,16 +1,30 @@
 #pragma once
 
-class Environment;
+#include <cstddef>
+
+namespace secs {
+
+class EntityStore;
 
 class Entity {
 public:
+  Entity(const Entity&) = delete;
+  Entity(Entity&&) = default;
 
-  Entity(Environment& env, size_t index)
-    : _env(&env)
-    , _index(index)
-  {}
+  Entity& operator = (const Entity&) = delete;
+  Entity& operator = (Entity&&) = default;
 
-  size_t index() const {
+  bool operator == (const Entity& other) const {
+    return _store == other._store
+        && _index == other._index
+        && _version == other._version;
+  }
+
+  bool operator != (const Entity& other) const {
+    return !(*this == other);
+  }
+
+  size_t id() const {
     return _index;
   }
 
@@ -32,10 +46,30 @@ public:
   template<typename T, typename... Args>
   T& emplace_component(Args&&... args) const;
 
+  template<typename T>
+  void remove_component() const;
+
+  void destroy() const;
+
 private:
 
-  Environment* _env;
+  Entity(EntityStore& store, size_t index, uint64_t version)
+    : _store(&store)
+    , _index(index)
+    , _version(version)
+  {}
+
+  void check_version() const;
+
+private:
+
+  EntityStore* _store;
   size_t       _index;
+  uint64_t     _version;
+
+  friend class EntityStore;
 };
+
+} // namespace secs
 
 #include "entity.inline.h"

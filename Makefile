@@ -1,6 +1,6 @@
 #### PROJECT SETTINGS ####
 # The name of the executable to be created
-BIN_NAME := ecs-test
+BIN_NAME := test
 # Compiler used
 CXX ?= g++
 # Extension of source files used in the project
@@ -12,7 +12,7 @@ LIBS =
 # General compiler flags
 COMPILE_FLAGS = -std=c++14 -Wall -Wextra -g
 # Additional release-specific flags
-RCOMPILE_FLAGS = -D NDEBUG
+RCOMPILE_FLAGS = -D NDEBUG -O2
 # Additional debug-specific flags
 DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths

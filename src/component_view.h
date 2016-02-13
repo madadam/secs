@@ -3,6 +3,7 @@
 #include <cassert>
 #include "component_store.h"
 
+namespace secs {
 namespace detail {
 
 template<typename T>
@@ -40,7 +41,7 @@ class ConstComponentView : public detail::ComponentView<T> {
 public:
 
 private:
-  friend class Environment;
+  friend class EntityStore;
 };
 
 template<typename T>
@@ -67,5 +68,7 @@ public:
   }
 
 private:
-  friend class Environment;
+  friend class EntityStore;
 };
+
+} // namespace secs

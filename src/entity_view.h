@@ -3,6 +3,8 @@
 #include <iterator>
 #include "entity.h"
 
+namespace secs {
+
 template<typename... Ts>
 class EntityView {
 public:
@@ -14,11 +16,11 @@ public:
                                         , Entity>
   {
     bool operator == (iterator other) const {
-      return _env == other._env && _index == other._index;
+      return _store == other._store && _index == other._index;
     }
 
     bool operator != (iterator other) const {
-      return _env != other._env || _index != other._index;
+      return _store != other._store || _index != other._index;
     }
 
     iterator& operator ++ () {
@@ -33,13 +35,13 @@ public:
     }
 
     Entity operator * () const {
-      return Entity(*_env, _index);
+      return _store->get(_index);
     }
 
   private:
 
-    iterator(Environment& env, size_t index)
-      : _env(&env)
+    iterator(EntityStore& store, size_t index)
+      : _store(&store)
       , _index(index)
     {
       advance(0);
@@ -49,12 +51,12 @@ public:
       _index += offset;
 
       while (true) {
-        if (_index >= _env->entity_capacity()) {
-          _index = _env->entity_capacity();
+        if (_index >= _store->capacity()) {
+          _index = _store->capacity();
           return;
         }
 
-        if (_env->has_all_components<Ts...>(_index)) {
+        if (_store->has_all_components<Ts...>(_index)) {
           return;
         }
 
@@ -64,7 +66,7 @@ public:
 
   private:
 
-    Environment* _env;
+    EntityStore* _store;
     size_t       _index;
 
     friend class EntityView;
@@ -75,22 +77,34 @@ public:
   using difference_type = typename iterator::difference_type;
   using size_type       = size_t;
 
-  EntityView(Environment& env)
-    : _env(env)
+  EntityView(EntityStore& store)
+    : _store(store)
   {}
+
+  EntityView(const EntityView&) = default;
+  EntityView(EntityView&&) = default;
 
   EntityView<Ts...>& operator = (const EntityView&) = delete;
   EntityView<Ts...>& operator = (EntityView&&) = delete;
 
   iterator begin() const {
-    return iterator(_env, 0);
+    return iterator(_store, 0);
   }
 
   iterator end() const {
-    return iterator(_env, _env.entities_capacity());
+    return iterator(_store, _store.capacity());
+  }
+
+  template<typename F>
+  void each(F&& f) {
+    for (auto entity : *this) {
+      f(entity, entity.template get_component<Ts>()...);
+    }
   }
 
 private:
 
-  Environment& _env;
+  EntityStore& _store;
 };
+
+} // namespace secs

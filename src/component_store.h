@@ -3,6 +3,8 @@
 #include <memory>
 #include <boost/dynamic_bitset.hpp>
 
+namespace secs {
+
 // Type-erased continuous storage for any type.
 class ComponentStore {
 public:
@@ -10,6 +12,12 @@ public:
   ComponentStore() {}
   ComponentStore(const ComponentStore&) = delete;
   ComponentStore(ComponentStore&&) = default;
+
+  ~ComponentStore() {
+    for (size_t i = 0; i < size(); ++i) {
+      if (_flags[i]) _deleter(_data, i);
+    }
+  }
 
   ComponentStore& operator = (const ComponentStore&) = delete;
   ComponentStore& operator = (ComponentStore&&) = default;
@@ -36,8 +44,17 @@ public:
     }
 
     new (ptr<T>(_data, index)) T(std::forward<Args>(args)...);
+
     _flags[index] = true;
+
+    if (!_deleter) {
+      _deleter = [](std::unique_ptr<char[]>& data, size_t index) {
+        ptr<T>(data, index)->~T();
+      };
+    }
   }
+
+  void erase(size_t index);
 
 private:
 
@@ -89,4 +106,7 @@ private:
 
   boost::dynamic_bitset<> _flags;
   std::unique_ptr<char[]> _data;
+  std::function<void(std::unique_ptr<char[]>&, size_t)> _deleter;
 };
+
+} // namespace secs
