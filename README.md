@@ -1,2 +1,2 @@
 # secs
-Simple and efficient Entity Component System framework for C++
+Minimalist Entity Component System framework for C++
