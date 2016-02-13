@@ -25,7 +25,7 @@ public:
   }
 
   template<typename T>
-  typename std::decay<T>::type& add_system(typename std::decay<T>::type&& system) {
+  T& add_system(T&& system) {
     static_assert(std::is_convertible<T*, System*>::value, "T must be derived from System");
     _systems.push_back(std::make_unique<T>(std::move(system)));
     return static_cast<T&>(*_systems.back());

@@ -1,80 +1,61 @@
-#include <chrono>
-#include <iostream>
+#define CATCH_CONFIG_MAIN
+#include "catch.hpp"
 
 #include "environment.h"
+#include "type_index.h"
 
-namespace chrono = std::chrono;
-using std::cout;
-using std::endl;
-using std::string;
+using namespace secs;
 
-using secs::Environment;
-using secs::System;
+struct Instrument {
+  bool* visited;
+};
+
+struct Position {};
+struct Velocity {};
 
 template<typename T>
-void unused(T) {}
-
-template<typename F>
-chrono::microseconds benchmark(F block) {
-  auto start = chrono::high_resolution_clock::now();
-  block();
-  auto end = chrono::high_resolution_clock::now();
-
-  return chrono::duration_cast<chrono::microseconds>(end - start);
-}
-
-string to_string(chrono::microseconds us) {
-  return std::to_string(((float) us.count()) / 1000.0);
-}
-
-struct Name {
-  string name;
-};
-
-struct Position {
-  float x = 0;
-  float y = 0;
-};
-
-struct Shape {
-  float radius = 0;
-};
-
-struct Motion {
-  float dx = 0;
-  float dy = 0;
-};
-
-struct DebugSystem : public System<> {
+struct Visitor : System<> {
   void update(Environment<>& env) override {
-    env.entities<Name, Position>().each([](auto&, auto& name, auto& position) {
-      cout << "name: " << name.name
-           << " position: (" << position.x << ", " << position.y << ")"
-           << endl;
-    });
+    for (auto e : env.entities<Instrument, T>()) {
+      *e.template get_component<Instrument>().visited = true;
+    }
   }
 };
 
-int main(int /*argc*/, char** /*argv*/) {
+TEST_CASE("Smoke test") {
   Environment<> env;
 
-  auto a = env.create_entity();
-  auto b = env.create_entity();
+  bool e0_visited = false;
+  bool e1_visited = false;
 
-  a.add_component(Name{ "Alice" });
-  a.add_component(Position{ 0, 0 });
-  a.add_component(Shape{ 10 });
+  auto e0 = env.create_entity();
+  e0.add_component(Instrument{ &e0_visited });
+  e0.add_component(Position());
+  e0.add_component(Velocity());
 
-  b.add_component(Name{ "Bob" });
-  b.add_component(Position{ 10, 0 });
-  b.add_component(Motion{ -1, 0 });
-  b.add_component(Shape{ 2 });
+  auto e1 = env.create_entity();
+  e1.add_component(Instrument{ &e1_visited });
+  e1.add_component(Position());
 
-  env.emplace_system<DebugSystem>();
+  env.add_system(Visitor<Velocity>());
   env.update();
 
-  // a.destroy();
-  // a.add_component(Motion{ 0, 0 });
+  CHECK(e0_visited);
+  CHECK(!e1_visited);
+}
 
-  return 0;
+TEST_CASE("Destroy entity") {
+  Environment<> env;
+  auto e = env.create_entity();
+  e.add_component(Position());
+  e.destroy();
+
+  CHECK_THROWS_AS(e.get_component<Position>(), error::EntityInvalid);
+}
+
+TEST_CASE("TypeIndex") {
+  TypeIndex ti;
+
+  CHECK(ti.get<Position>() == ti.get<Position>());
+  CHECK(ti.get<Position>() != ti.get<Velocity>());
 }
