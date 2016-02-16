@@ -102,6 +102,10 @@ public:
     }
   }
 
+  bool empty() const {
+    return begin() == end();
+  }
+
 private:
 
   EntityStore& _store;

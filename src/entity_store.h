@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cassert>
 #include <vector>
 
 #include "component_store.h"
 #include "component_view.h"
-#include "errors.h"
 #include "type_index.h"
 
 namespace secs {
@@ -50,48 +50,24 @@ private:
   template<typename T>
   T& get_component(size_t index) {
     auto cs = components<T>();
-
-    if (cs.contains(index)) {
-      return cs[index];
-    } else {
-      throw error::ComponentNotFound();
-    }
-  }
-
-  template<typename T>
-  T& get_or_add_component(size_t index) {
-    // TODO: emit on_component_create
+    assert(cs.contains(index));
     return components<T>()[index];
   }
 
-  template<typename T>
-  T& add_component(size_t index, T&& component) {
-    // TODO: emit on_component_create
-    auto cs = components<T>();
-
-    if (cs.contains(index)) {
-      throw error::ComponentAlreadyExists();
-    } else {
-      return cs[index] = std::forward<T>(component);
-    }
-  }
-
   template<typename T, typename... Args>
-  T& emplace_component(size_t index, Args&&... args) {
+  T& create_component(size_t index, Args&&... args) {
     // TODO: emit on_component_create
     auto cs = components<T>();
-
-    if (cs.contains(index)) {
-      throw error::ComponentAlreadyExists();
-    } else {
-      cs.emplace(index, std::forward<Args>(args)...);
-      return cs[index];
-    }
+    assert(!cs.contains(index));
+    cs.emplace(index, std::forward<Args>(args)...);
+    return cs[index];
   }
 
   template<typename T>
-  void remove_component(size_t index) {
-    components<T>().erase(index);
+  void destroy_component(size_t index) {
+    auto cs = components<T>();
+    assert(cs.contains(index));
+    cs.erase(index);
   }
 
   template<typename T>
@@ -129,8 +105,11 @@ private:
   static ComponentStore       _empty_store;
 
   template<typename...> friend class EntityView;
+  template<typename> friend class Handle;
+  template<typename> friend class ComponentPtr;
   friend class Entity;
 };
+
 
 template<typename... Ts>
 bool EntityStore::has_all_components(size_t index) const {

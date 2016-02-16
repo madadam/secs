@@ -1,74 +1,45 @@
 #pragma once
 
-#include <cstddef>
+#include "handle.h"
 
 namespace secs {
 
+template<typename> class ComponentPtr;
 class EntityStore;
 
-class Entity {
+class Entity : public Handle<Entity> {
+  using Handle::Handle;
+
 public:
-  Entity(const Entity&) = delete;
-  Entity(Entity&&) = default;
-
-  Entity& operator = (const Entity&) = delete;
-  Entity& operator = (Entity&&) = default;
-
-  bool operator == (const Entity& other) const {
-    return _store == other._store
-        && _index == other._index
-        && _version == other._version;
+  explicit operator bool () const {
+    return valid();
   }
 
-  bool operator != (const Entity& other) const {
-    return !(*this == other);
-  }
-
-  size_t id() const {
-    return _index;
-  }
-
-  template<typename T>
-  bool has_component() const;
-
-  template<typename... Ts>
-  bool has_all_components() const;
-
-  template<typename T>
-  T& get_component() const;
-
-  template<typename T>
-  T& get_or_add_component() const;
-
-  template<typename T>
-  T& add_component(T&& c) const;
-
-  template<typename T, typename... Args>
-  T& emplace_component(Args&&... args) const;
-
-  template<typename T>
-  void remove_component() const;
+  template<typename T> ComponentPtr<T> component() const;
+  template<typename T0, typename T1, typename... Ts> void add_components() const;
+  template<typename T> void add_components() const;
+  template<typename T, typename... Ts> void add_components(T&, Ts&&...) const;
 
   void destroy() const;
 
 private:
-
-  Entity(EntityStore& store, size_t index, uint64_t version)
-    : _store(&store)
-    , _index(index)
-    , _version(version)
-  {}
-
-  void check_version() const;
-
-private:
-
-  EntityStore* _store;
-  size_t       _index;
-  uint64_t     _version;
-
+  void add_components() const {};
   friend class EntityStore;
 };
+
+template<typename T0, typename T1, typename... Ts> void Entity::add_components() const {
+  component<T0>().create();
+  add_components<T1, Ts...>();
+}
+
+template<typename T> void Entity::add_components() const {
+  component<T>().create();
+}
+
+template<typename T, typename... Ts> void Entity::add_components(T& c, Ts&&... cs) const {
+  component<T>().create(std::forward<T>(c));
+  add_components(std::forward<Ts>(cs)...);
+}
 
 } // namespace secs
 

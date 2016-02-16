@@ -7,7 +7,7 @@
 using namespace secs;
 
 struct Instrument {
-  bool* visited;
+  bool visited = false;
 };
 
 struct Position {};
@@ -17,40 +17,74 @@ template<typename T>
 struct Visitor : System<> {
   void update(Environment<>& env) override {
     for (auto e : env.entities<Instrument, T>()) {
-      *e.template get_component<Instrument>().visited = true;
+      e.template component<Instrument>()->visited = true;
     }
   }
 };
 
-TEST_CASE("Smoke test") {
+TEST_CASE("Various ways to create components") {
   Environment<> env;
 
-  bool e0_visited = false;
-  bool e1_visited = false;
+  SECTION(".component().create() and .component().or_create()") {
+    auto e = env.create_entity();
+    e.component<Position>().create();
+    CHECK(e.component<Position>());
 
-  auto e0 = env.create_entity();
-  e0.add_component(Instrument{ &e0_visited });
-  e0.add_component(Position());
-  e0.add_component(Velocity());
+    auto& c0 = e.component<Velocity>().or_create();
+    auto& c1 = e.component<Velocity>().or_create();
+    CHECK(&c0 == &c1);
+  }
 
-  auto e1 = env.create_entity();
-  e1.add_component(Instrument{ &e1_visited });
-  e1.add_component(Position());
+  SECTION(".add_components() with types") {
+    auto e = env.create_entity();
+    e.add_components<Position, Velocity>();
+    CHECK(e.component<Position>());
+    CHECK(e.component<Velocity>());
+  }
+
+  SECTION(".add_components() with values") {
+    Position c0;
+    Velocity c1;
+    auto e = env.create_entity();
+    e.add_components(c0, c1);
+    CHECK(e.component<Position>());
+    CHECK(e.component<Velocity>());
+  }
+
+  SECTION("create entity with component types") {
+    auto e = env.create_entity<Position, Velocity>();
+    CHECK(e.component<Position>());
+    CHECK(e.component<Velocity>());
+  }
+
+  SECTION("create entity with component values") {
+    Position c0;
+    Velocity c1;
+    auto e = env.create_entity(c0, c1);
+    CHECK(e.component<Position>());
+    CHECK(e.component<Velocity>());
+  }
+}
+
+TEST_CASE("Entity filtering by components") {
+  Environment<> env;
+
+  auto e0 = env.create_entity<Instrument, Position, Velocity>();
+  auto e1 = env.create_entity<Instrument, Position>();
 
   env.add_system(Visitor<Velocity>());
   env.update();
 
-  CHECK(e0_visited);
-  CHECK(!e1_visited);
+  CHECK(e0.component<Instrument>()->visited);
+  CHECK(!e1.component<Instrument>()->visited);
 }
 
 TEST_CASE("Destroy entity") {
   Environment<> env;
-  auto e = env.create_entity();
-  e.add_component(Position());
+  auto e = env.create_entity<Position>();
   e.destroy();
 
-  CHECK_THROWS_AS(e.get_component<Position>(), error::EntityInvalid);
+  CHECK(!e);
 }
 
 TEST_CASE("TypeIndex") {
