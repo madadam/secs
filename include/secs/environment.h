@@ -1,7 +1,7 @@
 #pragma once
 
-#include "entity_store.h"
-#include "system.h"
+#include "secs/entity_store.h"
+#include "secs/system.h"
 
 namespace secs {
 

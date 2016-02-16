@@ -1,4 +1,4 @@
-#include "entity_store.h"
+#include "secs/entity_store.h"
 
 using namespace secs;
 

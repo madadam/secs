@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cassert>
-#include "component_store.h"
+#include "secs/component_store.h"
 
 namespace secs {
 namespace detail {

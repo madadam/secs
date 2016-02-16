@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cassert>
-#include "entity_store.h"
-#include "component_ptr.h"
+#include "secs/entity_store.h"
+#include "secs/component_ptr.h"
 
 namespace secs {
 

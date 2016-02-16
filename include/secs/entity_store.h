@@ -3,9 +3,9 @@
 #include <cassert>
 #include <vector>
 
-#include "component_store.h"
-#include "component_view.h"
-#include "type_index.h"
+#include "secs/component_store.h"
+#include "secs/component_view.h"
+#include "secs/type_index.h"
 
 namespace secs {
 

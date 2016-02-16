@@ -1,4 +1,4 @@
-#include "component_store.h"
+#include "secs/component_store.h"
 
 using namespace secs;
 

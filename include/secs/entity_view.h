@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iterator>
-#include "entity.h"
+#include "secs/entity.h"
 
 namespace secs {
 
