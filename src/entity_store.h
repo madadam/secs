@@ -72,7 +72,7 @@ private:
 
   template<typename T>
   ConstComponentView<const T> components() const {
-    auto index = TypeIndex::get<T>();
+    auto index = _type_index.get<T>();
 
     if (index >= _stores.size()) {
       return { _empty_store };
@@ -83,7 +83,7 @@ private:
 
   template<typename T>
   MutableComponentView<T> components() {
-    auto index = TypeIndex::get<T>();
+    auto index = _type_index.get<T>();
 
     if (index >= _stores.size()) {
       _stores.resize(index + 1);
@@ -100,6 +100,7 @@ private:
   std::vector<size_t>         _holes;
   std::vector<uint64_t>       _versions;
 
+  TypeIndex                   _type_index;
   std::vector<ComponentStore> _stores;
   static ComponentStore       _empty_store;
 

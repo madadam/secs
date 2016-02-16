@@ -1,40 +1,46 @@
 #pragma once
 
-#include <limits>
-#include <mutex>
-#include <vector>
+#include <boost/container/flat_map.hpp>
 
 namespace secs {
 
+//
 // Helper struct that maps types to integer indices. The indices are assigned
 // in order, starting from 0, so they are useful for indexing arrays.
+//
+// Examples:
+//   TypeIndex ti;
+//   assert(ti.get<Foo>() == ti.get<Foo>());
+//   assert(ti.get<Bar>() != ti.get<Foo>());
+//
 struct TypeIndex {
-  static const size_t INVALID;
-
 private:
+  typedef void (*Key)();
+
   template<typename T>
-  struct Holder {
-    static size_t value;
+  struct KeyGen {
+    static void dummy() {}
+    static constexpr Key value() {
+      return &dummy;
+    }
   };
 
-
-  static size_t _next;
-  static std::mutex _mutex;
+  mutable boost::container::flat_map<Key, size_t> _map;
+  mutable size_t _next = 0;
 
 public:
-  template<typename T>
-  static size_t get() {
-    std::lock_guard<std::mutex> lock(_mutex);
 
-    if (Holder<T>::value == INVALID) {
-      Holder<T>::value = _next++;
+  template<typename T>
+  size_t get() const {
+    auto key = KeyGen<T>::value();
+    auto it = _map.find(key);
+
+    if (it == _map.end()) {
+      it = _map.insert(it, std::make_pair(key, _next++));
     }
 
-    return Holder<T>::value;
+    return it->second;
   }
 };
-
-template<typename T>
-size_t TypeIndex::Holder<T>::value = TypeIndex::INVALID;
 
 } // namespace secs
