@@ -22,7 +22,24 @@ struct Visitor : System<> {
   }
 };
 
-TEST_CASE("Various ways to create components") {
+TEST_CASE("Create and destroy Entity") {
+  Environment<> env;
+  CHECK(env.num_entities() == 0);
+
+  auto e0 = env.create_entity();
+  CHECK(env.num_entities() == 1);
+
+  auto e1 = env.create_entity();
+  CHECK(env.num_entities() == 2);
+
+  e0.destroy();
+  CHECK(env.num_entities() == 1);
+
+  e1.destroy();
+  CHECK(env.num_entities() == 0);
+}
+
+TEST_CASE("Create Components") {
   Environment<> env;
 
   SECTION(".component().create() and .component().or_create()") {
@@ -51,13 +68,13 @@ TEST_CASE("Various ways to create components") {
     CHECK(e.component<Velocity>());
   }
 
-  SECTION("create entity with component types") {
+  SECTION("create Entity with Component types") {
     auto e = env.create_entity<Position, Velocity>();
     CHECK(e.component<Position>());
     CHECK(e.component<Velocity>());
   }
 
-  SECTION("create entity with component values") {
+  SECTION("create Entity with Component values") {
     Position c0;
     Velocity c1;
     auto e = env.create_entity(c0, c1);
@@ -66,7 +83,7 @@ TEST_CASE("Various ways to create components") {
   }
 }
 
-TEST_CASE("Entity filtering by components") {
+TEST_CASE("Entity filtering by Components") {
   Environment<> env;
 
   auto e0 = env.create_entity<Instrument, Position, Velocity>();
@@ -77,14 +94,6 @@ TEST_CASE("Entity filtering by components") {
 
   CHECK(e0.component<Instrument>()->visited);
   CHECK(!e1.component<Instrument>()->visited);
-}
-
-TEST_CASE("Destroy entity") {
-  Environment<> env;
-  auto e = env.create_entity<Position>();
-  e.destroy();
-
-  CHECK(!e);
 }
 
 TEST_CASE("TypeIndex") {

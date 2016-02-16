@@ -22,6 +22,10 @@ public:
     return _store.template get<T>(index);
   }
 
+  size_t size() const {
+    return _store.size();
+  }
+
 protected:
   ComponentView(StoreRef store)
     : _store(store)
