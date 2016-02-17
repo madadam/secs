@@ -1,8 +1,8 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
-#include "environment.h"
-#include "type_index.h"
+#include "secs/container.h"
+#include "secs/type_index.h"
 
 using namespace secs;
 
@@ -13,37 +13,28 @@ struct Instrument {
 struct Position {};
 struct Velocity {};
 
-template<typename T>
-struct Visitor : System<> {
-  void update(Environment<>& env) override {
-    for (auto e : env.entities<Instrument, T>()) {
-      e.template component<Instrument>()->visited = true;
-    }
-  }
-};
-
 TEST_CASE("Create and destroy Entity") {
-  Environment<> env;
-  CHECK(env.num_entities() == 0);
+  Container container;
+  CHECK(container.num_entities() == 0);
 
-  auto e0 = env.create_entity();
-  CHECK(env.num_entities() == 1);
+  auto e0 = container.create_entity();
+  CHECK(container.num_entities() == 1);
 
-  auto e1 = env.create_entity();
-  CHECK(env.num_entities() == 2);
+  auto e1 = container.create_entity();
+  CHECK(container.num_entities() == 2);
 
   e0.destroy();
-  CHECK(env.num_entities() == 1);
+  CHECK(container.num_entities() == 1);
 
   e1.destroy();
-  CHECK(env.num_entities() == 0);
+  CHECK(container.num_entities() == 0);
 }
 
 TEST_CASE("Create Components") {
-  Environment<> env;
+  Container container;
 
   SECTION(".component().create() and .component().or_create()") {
-    auto e = env.create_entity();
+    auto e = container.create_entity();
     e.component<Position>().create();
     CHECK(e.component<Position>());
 
@@ -53,7 +44,7 @@ TEST_CASE("Create Components") {
   }
 
   SECTION(".add_components() with types") {
-    auto e = env.create_entity();
+    auto e = container.create_entity();
     e.add_components<Position, Velocity>();
     CHECK(e.component<Position>());
     CHECK(e.component<Velocity>());
@@ -62,14 +53,14 @@ TEST_CASE("Create Components") {
   SECTION(".add_components() with values") {
     Position c0;
     Velocity c1;
-    auto e = env.create_entity();
+    auto e = container.create_entity();
     e.add_components(c0, c1);
     CHECK(e.component<Position>());
     CHECK(e.component<Velocity>());
   }
 
   SECTION("create Entity with Component types") {
-    auto e = env.create_entity<Position, Velocity>();
+    auto e = container.create_entity<Position, Velocity>();
     CHECK(e.component<Position>());
     CHECK(e.component<Velocity>());
   }
@@ -77,20 +68,21 @@ TEST_CASE("Create Components") {
   SECTION("create Entity with Component values") {
     Position c0;
     Velocity c1;
-    auto e = env.create_entity(c0, c1);
+    auto e = container.create_entity(c0, c1);
     CHECK(e.component<Position>());
     CHECK(e.component<Velocity>());
   }
 }
 
 TEST_CASE("Entity filtering by Components") {
-  Environment<> env;
+  Container container;
 
-  auto e0 = env.create_entity<Instrument, Position, Velocity>();
-  auto e1 = env.create_entity<Instrument, Position>();
+  auto e0 = container.create_entity<Instrument, Position, Velocity>();
+  auto e1 = container.create_entity<Instrument, Position>();
 
-  env.add_system(Visitor<Velocity>());
-  env.update();
+  for (auto e : container.entities<Instrument, Velocity>()) {
+    e.component<Instrument>()->visited = true;
+  }
 
   CHECK(e0.component<Instrument>()->visited);
   CHECK(!e1.component<Instrument>()->visited);
