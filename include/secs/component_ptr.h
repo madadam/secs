@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <utility>
 #include "secs/handle.h"
 
 namespace secs {

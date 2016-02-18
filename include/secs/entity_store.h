@@ -8,7 +8,7 @@
 #include "secs/type_index.h"
 
 namespace secs {
-
+namespace detail { class Handle; }
 template<typename> class ConstComponentView;
 template<typename> class MutableComponentView;
 class Entity;
@@ -105,7 +105,7 @@ private:
   static ComponentStore       _empty_store;
 
   template<typename...> friend class EntityView;
-  template<typename> friend class Handle;
+  friend class detail::Handle;
   template<typename> friend class ComponentPtr;
   friend class Entity;
 };
