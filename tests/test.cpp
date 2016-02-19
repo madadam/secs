@@ -74,11 +74,23 @@ TEST_CASE("Create Components") {
   }
 }
 
-TEST_CASE("Entity filtering by Components") {
+TEST_CASE("Get Entities") {
   Container container;
+
+  auto b = container.entities<Instrument, Position>().empty();
+  CHECK(b);
 
   auto e0 = container.create_entity<Instrument, Position, Velocity>();
   auto e1 = container.create_entity<Instrument, Position>();
+
+  auto b0 = container.entities<>().empty();
+  auto b1 = container.entities<Instrument>().empty();
+  auto b2 = container.entities<Instrument, Position>().empty();
+  auto b3 = container.entities<Instrument, Position, Velocity>().empty();
+  CHECK(!b0);
+  CHECK(!b1);
+  CHECK(!b2);
+  CHECK(!b3);
 
   for (auto e : container.entities<Instrument, Velocity>()) {
     e.component<Instrument>()->visited = true;

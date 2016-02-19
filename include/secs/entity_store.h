@@ -18,6 +18,13 @@ class EntityStore {
 public:
 
   Entity create();
+
+  template<typename C, typename... Cs>
+  Entity create();
+
+  template<typename C, typename... Cs>
+  Entity create(C&& c, Cs&&... cs);
+
   void destroy(const Entity& entity);
 
   Entity get(size_t index);

@@ -106,6 +106,14 @@ public:
     return begin() == end();
   }
 
+  Entity front() const {
+    return *begin();
+  }
+
+  Entity create() {
+    return _store.create<Ts...>();
+  }
+
 private:
 
   EntityStore& _store;

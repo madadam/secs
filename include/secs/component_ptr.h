@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <utility>
+#include "secs/entity_store.h"
 #include "secs/handle.h"
 
 namespace secs {

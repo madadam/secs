@@ -13,16 +13,12 @@ public:
 
   template<typename C, typename... Cs>
   Entity create_entity() {
-    auto e = _entities.create();
-    e.add_components<C, Cs...>();
-    return e;
+    return _entities.create<C, Cs...>();
   }
 
   template<typename C, typename... Cs>
   Entity create_entity(C&& c, Cs&&... cs) {
-    auto e = _entities.create();
-    e.add_components(std::forward<C>(c), std::forward<Cs>(cs)...);
-    return e;
+    return _entities.create(std::forward<C>(c), std::forward<Cs>(cs)...);
   }
 
   void destroy_entity(const Entity& entity) {
