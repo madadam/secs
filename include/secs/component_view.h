@@ -17,8 +17,7 @@ public:
     return _store.contains(index);
   }
 
-  const T& operator [] (size_t index) const {
-    assert(contains(index));
+  const T* get(size_t index) const {
     return _store.template get<T>(index);
   }
 
@@ -34,20 +33,6 @@ protected:
 protected:
   StoreRef _store;
 };
-
-template<typename T>
-typename std::enable_if<std::is_default_constructible<T>::value>::type
-handle_missing(ComponentStore& store, size_t index) {
-  if (!store.contains(index)) {
-      store.emplace<T>(index);
-  }
-}
-
-template<typename T>
-typename std::enable_if<!std::is_default_constructible<T>::value>::type
-handle_missing(ComponentStore& store, size_t index) {
-  assert(store.contains(index));
-}
 
 } // namespace detail
 
@@ -70,16 +55,15 @@ class MutableComponentView: public detail::ComponentView<T> {
 public:
 
   using detail::ComponentView<T>::contains;
-  using detail::ComponentView<T>::operator [];
+  using detail::ComponentView<T>::get;
 
-  T& operator [] (size_t index) {
-    detail::handle_missing<T>(_store, index);
+  T* get(size_t index) {
     return _store.template get<T>(index);
   }
 
   template<typename... Args>
-  void emplace(size_t index, Args&&... args) {
-    _store.emplace<T>(index, std::forward<Args>(args)...);
+  T& emplace(size_t index, Args&&... args) {
+    return _store.emplace<T>(index, std::forward<Args>(args)...);
   }
 
 private:

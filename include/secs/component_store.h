@@ -31,12 +31,12 @@ public:
   }
 
   template<typename T>
-  T& get(size_t index) {
-    return *ptr<T>(_data, index);
+  T* get(size_t index) {
+    return contains(index) ? ptr<T>(_data, index) : nullptr;
   }
 
   template<typename T, typename... Args>
-  void emplace(size_t index, Args&&... args) {
+  T& emplace(size_t index, Args&&... args) {
     ensure_space<T>(index);
 
     if (_flags[index]) {
@@ -52,6 +52,8 @@ public:
         ptr<T>(data, index)->~T();
       };
     }
+
+    return *ptr<T>(_data, index);
   }
 
   void erase(size_t index);

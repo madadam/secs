@@ -23,13 +23,18 @@ public:
   }
 
   T& operator * () const {
-    assert(valid());
-    return _store->template get_component<T>(_index);
+    assert(valid() && exists());
+    return *_store->template get_component<T>(_index);
   }
 
   T* operator -> () const {
+    assert(valid() && exists());
+    return _store->template get_component<T>(_index);
+  }
+
+  T* get() const {
     assert(valid());
-    return &_store->template get_component<T>(_index);
+    return _store->template get_component<T>(_index);
   }
 
   // Creates new Component and assigns it to this Ptr.
@@ -46,7 +51,7 @@ public:
     assert(valid());
 
     if (exists()) {
-      return _store->template get_component<T>(_index);
+      return *_store->template get_component<T>(_index);
     } else {
       return _store->template create_component<T>(_index, std::forward<Args>(args)...);
     }

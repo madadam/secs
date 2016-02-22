@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace secs {
 
@@ -64,6 +65,17 @@ public:
   bool operator != (std::nullptr_t) const {
     return !(*this == nullptr);
   }
+
+  template<typename T>
+  friend bool operator < (const Handle<T>&, const Handle<T>&);
 };
+
+// Define comparison operator so Handles can be used as keys in std::sets and
+// std::maps.
+template<typename Base>
+bool operator < (const Handle<Base>& a, const Handle<Base>& b) {
+  return std::make_pair(a._index, a._version)
+       < std::make_pair(b._index, b._version);
+}
 
 } // namespace secs

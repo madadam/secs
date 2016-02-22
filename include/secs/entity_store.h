@@ -55,10 +55,8 @@ private:
   bool has_all_components(size_t index) const;
 
   template<typename T>
-  T& get_component(size_t index) {
-    auto cs = components<T>();
-    assert(cs.contains(index));
-    return components<T>()[index];
+  T* get_component(size_t index) {
+    return components<T>().get(index);
   }
 
   template<typename T, typename... Args>
@@ -66,8 +64,7 @@ private:
     // TODO: emit on_component_create
     auto cs = components<T>();
     assert(!cs.contains(index));
-    cs.emplace(index, std::forward<Args>(args)...);
-    return cs[index];
+    return cs.emplace(index, std::forward<Args>(args)...);
   }
 
   template<typename T>
