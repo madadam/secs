@@ -52,8 +52,20 @@ public:
     }
   }
 
-  // Destroys the Component pointed to by this Ptr. Invalidates all other Ptrs
-  // pointing to the same Component.
+  // Access the Entity that owns this Component.
+  Entity entity() const {
+    assert(valid());
+    return _store->get(_index);
+  }
+
+  // Access other Components on the same Entity that owns this Component.
+  template<typename U>
+  ComponentPtr<U> component() const {
+    return entity().component<U>();
+  }
+
+  // Destroys this Component. Invalidates all other Ptrs pointing to the same
+  // Component.
   void destroy() {
     assert(valid());
     _store->template destroy_component<T>();

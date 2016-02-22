@@ -35,6 +35,20 @@ protected:
   StoreRef _store;
 };
 
+template<typename T>
+typename std::enable_if<std::is_default_constructible<T>::value>::type
+handle_missing(ComponentStore& store, size_t index) {
+  if (!store.contains(index)) {
+      store.emplace<T>(index);
+  }
+}
+
+template<typename T>
+typename std::enable_if<!std::is_default_constructible<T>::value>::type
+handle_missing(ComponentStore& store, size_t index) {
+  assert(store.contains(index));
+}
+
 } // namespace detail
 
 template<typename T>
@@ -59,10 +73,7 @@ public:
   using detail::ComponentView<T>::operator [];
 
   T& operator [] (size_t index) {
-    if (!contains(index)) {
-      _store.emplace<T>(index);
-    }
-
+    detail::handle_missing<T>(_store, index);
     return _store.template get<T>(index);
   }
 
