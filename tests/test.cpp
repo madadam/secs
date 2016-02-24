@@ -38,8 +38,8 @@ TEST_CASE("Create Components") {
     e.component<Position>().create();
     CHECK(e.component<Position>());
 
-    auto& c0 = e.component<Velocity>().or_create();
-    auto& c1 = e.component<Velocity>().or_create();
+    auto& c0 = *e.component<Velocity>().or_create();
+    auto& c1 = *e.component<Velocity>().or_create();
     CHECK(&c0 == &c1);
   }
 

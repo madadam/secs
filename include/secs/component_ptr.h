@@ -39,22 +39,23 @@ public:
 
   // Creates new Component and assigns it to this Ptr.
   template<typename... Args>
-  T& create(Args&&... args) {
+  ComponentPtr create(Args&&... args) {
     assert(valid());
-    return _store->template create_component<T>(_index, std::forward<Args>(args)...);
+    _store->template create_component<T>(_index, std::forward<Args>(args)...);
+    return *this;
   }
 
   // If this Ptr does not currently point to any Component, creates and assigns
   // a new one.
   template<typename... Args>
-  T& or_create(Args&&... args) {
+  ComponentPtr or_create(Args&&... args) {
     assert(valid());
 
-    if (exists()) {
-      return *_store->template get_component<T>(_index);
-    } else {
-      return _store->template create_component<T>(_index, std::forward<Args>(args)...);
+    if (!exists()) {
+      _store->template create_component<T>(_index, std::forward<Args>(args)...);
     }
+
+    return *this;
   }
 
   // Access the Entity that owns this Component.
@@ -74,7 +75,6 @@ public:
   void destroy() {
     assert(valid());
     _store->template destroy_component<T>();
-
   }
 
 protected:
