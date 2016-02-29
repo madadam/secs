@@ -13,6 +13,12 @@ struct Instrument {
 struct Position {};
 struct Velocity {};
 
+struct Name {
+public:
+  Name(std::string name = {}) : name(std::move(name)) {}
+  std::string name;
+};
+
 TEST_CASE("Create and destroy Entity") {
   Container container;
   CHECK(container.num_entities() == 0);
@@ -106,3 +112,18 @@ TEST_CASE("TypeIndex") {
   CHECK(ti.get<Position>() == ti.get<Position>());
   CHECK(ti.get<Position>() != ti.get<Velocity>());
 }
+
+TEST_CASE("Rich components") {
+  Container container;
+
+  auto e0 = container.create_entity();
+  auto e1 = container.create_entity();
+
+  e0.component<Name>().create("foo");
+  e1.component<Name>().create("bar");
+
+  for (auto e : container.entities<Name>()) {
+    auto name = e.component<Name>()->name;
+  }
+}
+

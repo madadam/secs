@@ -33,13 +33,13 @@ public:
   }
 
   T* get() const {
-    assert(valid());
-    return _store->template get_component<T>(_index);
+    return valid() ? _store->template get_component<T>(_index) : nullptr;
   }
 
   // Creates new Component and assigns it to this Ptr.
   template<typename... Args>
   ComponentPtr create(Args&&... args) {
+    static_assert(std::is_constructible<T, Args...>::value, "component is not constructible using the given args");
     assert(valid());
     _store->template create_component<T>(_index, std::forward<Args>(args)...);
     return *this;
@@ -49,6 +49,7 @@ public:
   // a new one.
   template<typename... Args>
   ComponentPtr or_create(Args&&... args) {
+    static_assert(std::is_constructible<T, Args...>::value, "component is not constructible using the given args");
     assert(valid());
 
     if (!exists()) {
