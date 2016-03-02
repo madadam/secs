@@ -71,11 +71,22 @@ public:
     return entity().component<U>();
   }
 
+  // Copy this Component to other Entity.
+  void copy_to(Entity other) {
+    other.component<T>().create(**this);
+  }
+
+  // Copy this Component to other Entity.
+  void move_to(Entity other) {
+    other.component<T>().create(std::move(**this));
+    _store->template destroy_component<T>(_index);
+  }
+
   // Destroys this Component. Invalidates all other Ptrs pointing to the same
   // Component.
   void destroy() {
     assert(valid());
-    _store->template destroy_component<T>();
+    _store->template destroy_component<T>(_index);
   }
 
 protected:

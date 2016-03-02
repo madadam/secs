@@ -66,6 +66,10 @@ public:
     return _store.emplace<T>(index, std::forward<Args>(args)...);
   }
 
+  void erase(size_t index) {
+    _store.erase(index);
+  }
+
 private:
   friend class EntityStore;
 };

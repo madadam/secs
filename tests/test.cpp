@@ -127,3 +127,63 @@ TEST_CASE("Rich components") {
   }
 }
 
+TEST_CASE("Copy component") {
+  Container container0;
+
+  SECTION("between Entities in the same Container") {
+    auto e0 = container0.create_entity<Position>();
+    auto e1 = container0.create_entity<Position, Velocity>();
+
+    e1.component<Velocity>().copy_to(e0);
+
+    CHECK(e0.component<Velocity>());
+    CHECK(e1.component<Velocity>());
+  }
+
+  SECTION("between Entities in different Containers") {
+    Container container1;
+    auto e0 = container0.create_entity<Position>();
+    auto e1 = container1.create_entity<Position, Velocity>();
+
+    e1.component<Velocity>().copy_to(e0);
+
+    CHECK(e0.component<Velocity>());
+    CHECK(e1.component<Velocity>());
+  }
+}
+
+TEST_CASE("Move component") {
+  Container container0;
+
+  SECTION("between Entities in the same Container") {
+    auto e0 = container0.create_entity<Position>();
+    auto e1 = container0.create_entity<Position, Velocity>();
+
+    e1.component<Velocity>().move_to(e0);
+
+    CHECK( e0.component<Velocity>());
+    CHECK(!e1.component<Velocity>());
+  }
+
+  SECTION("between Entities in different Containers") {
+    Container container1;
+    auto e0 = container0.create_entity<Position>();
+    auto e1 = container1.create_entity<Position, Velocity>();
+
+    e1.component<Velocity>().move_to(e0);
+
+    CHECK( e0.component<Velocity>());
+    CHECK(!e1.component<Velocity>());
+  }
+}
+
+TEST_CASE("Destroy component") {
+  Container container;
+  auto e = container.create_entity<Position, Velocity>();
+
+  e.component<Velocity>().destroy();
+
+  CHECK(!e.component<Velocity>());
+  CHECK( e.component<Position>());
+}
+
