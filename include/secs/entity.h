@@ -5,7 +5,7 @@
 namespace secs {
 
 template<typename> class ComponentPtr;
-class EntityStore;
+class Container;
 
 class Entity : public Handle<Entity> {
   using Handle::Handle;
@@ -16,31 +16,16 @@ public:
   }
 
   template<typename T> ComponentPtr<T> component() const;
-  template<typename T0, typename T1, typename... Ts> void add_components() const;
-  template<typename T> void add_components() const;
-  template<typename T, typename... Ts> void add_components(T&, Ts&&...) const;
 
+  Entity copy();
+  Entity copy_to(Container&);
+  Entity move_to(Container&);
   void destroy() const;
 
 private:
-  void add_components() const {};
-  friend class EntityStore;
+  friend class Container;
 };
-
-template<typename T0, typename T1, typename... Ts> void Entity::add_components() const {
-  component<T0>().create();
-  add_components<T1, Ts...>();
-}
-
-template<typename T> void Entity::add_components() const {
-  component<T>().create();
-}
-
-template<typename T, typename... Ts> void Entity::add_components(T& c, Ts&&... cs) const {
-  component<T>().create(std::forward<T>(c));
-  add_components(std::forward<Ts>(cs)...);
-}
 
 } // namespace secs
 
-#include "entity.inline.h"
+#include "container.inline.h"

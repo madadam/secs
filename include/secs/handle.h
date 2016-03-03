@@ -6,22 +6,22 @@
 
 namespace secs {
 
-class EntityStore;
+class Container;
 
 namespace detail {
 
 class Handle {
 public:
   Handle(std::nullptr_t)
-    : _store(nullptr)
+    : _container(nullptr)
     , _index(0)
     , _version(0)
   {}
 
 protected:
 
-  Handle(EntityStore& store, size_t index, uint64_t version)
-    : _store(&store)
+  Handle(Container& container, size_t index, uint64_t version)
+    : _container(&container)
     , _index(index)
     , _version(version)
   {}
@@ -29,9 +29,9 @@ protected:
   bool valid() const;
 
 protected:
-  EntityStore* _store;
-  size_t       _index;
-  uint64_t     _version;
+  Container* _container;
+  size_t     _index;
+  uint64_t   _version;
 };
 } // namespace detail
 
@@ -41,7 +41,7 @@ public:
   using detail::Handle::Handle;
 
   Base& operator = (std::nullptr_t) {
-    _store = nullptr;
+    _container = nullptr;
     _index = 0;
     _version = 0;
 
@@ -49,9 +49,9 @@ public:
   }
 
   bool operator == (const Base& other) const {
-    return _store == other._store
-        && _index == other._index
-        && _version == other._version;
+    return _container == other._container
+        && _index     == other._index
+        && _version   == other._version;
   }
 
   bool operator != (const Base& other) const {

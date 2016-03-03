@@ -1,42 +1,156 @@
 #pragma once
 
-#include "secs/entity_store.h"
+#include <cassert>
+#include <vector>
+
+#include "secs/component_store.h"
+#include "secs/component_view.h"
+#include "secs/type_index.h"
 
 namespace secs {
+namespace detail { class Handle; }
+template<typename> class ConstComponentView;
+template<typename> class MutableComponentView;
+class Entity;
+template<typename...> class EntityView;
 
 class Container {
 public:
 
-  Entity create_entity() {
-    return _entities.create();
-  }
+  // Create new Entity without any Components.
+  Entity create();
 
-  template<typename C, typename... Cs>
-  Entity create_entity() {
-    return _entities.create<C, Cs...>();
-  }
+  // Create new Entity with default-initialized components of the given types.
+  template<typename T, typename... Ts>
+  Entity create();
 
-  template<typename C, typename... Cs>
-  Entity create_entity(C&& c, Cs&&... cs) {
-    return _entities.create(std::forward<C>(c), std::forward<Cs>(cs)...);
-  }
+  // Create new Entity with the given Components.
+  template<typename T, typename... Ts>
+  Entity create(T&&, Ts&&...);
 
-  void destroy_entity(const Entity& entity) {
-    _entities.destroy(entity);
-  }
+  void destroy(const Entity& entity);
 
   template<typename... Ts>
-  EntityView<Ts...> entities() {
-    return _entities.filter<Ts...>();
+  EntityView<Ts...> all();
+
+  size_t size() const {
+    return _capacity - _holes.size();
   }
 
-  size_t num_entities() const {
-    return _entities.size();
-  }
+  Entity get(size_t index);
 
 private:
 
-  EntityStore _entities;
+  size_t capacity() const {
+    return _capacity;
+  }
+
+  uint64_t get_version(size_t index) const {
+    return index < _versions.size() ? _versions[index] : 0;
+  }
+
+  template<typename T>
+  bool has_component(size_t index) const {
+    return components<T>().contains(index);
+  }
+
+  template<typename... Ts>
+  bool has_all_components(size_t index) const;
+
+  template<typename T>
+  T* get_component(size_t index) {
+    return components<T>().get(index);
+  }
+
+  template<typename T, typename... Args>
+  T& create_component(size_t index, Args&&... args) {
+    // TODO: emit on_component_create
+    auto cs = components<T>();
+    assert(!cs.contains(index));
+    return cs.emplace(index, std::forward<Args>(args)...);
+  }
+
+  template<typename T>
+  void create_components(size_t index);
+
+  template<typename T0, typename T1, typename... T>
+  void create_components(size_t index);
+
+  template<typename T, typename... Ts>
+  void create_components(size_t, T&&, Ts&&...);
+  void create_components(size_t) {}
+
+  template<typename T>
+  void destroy_component(size_t index) {
+    auto cs = components<T>();
+    assert(cs.contains(index));
+    cs.erase(index);
+  }
+
+  template<typename T>
+  ConstComponentView<const T> components() const {
+    auto index = _type_index.get<T>();
+
+    if (index >= _stores.size()) {
+      return { _empty_store };
+    } else {
+      return { _stores[index] };
+    }
+  }
+
+  template<typename T>
+  MutableComponentView<T> components() {
+    auto index = _type_index.get<T>();
+
+    if (index >= _stores.size()) {
+      _stores.resize(index + 1);
+    }
+
+    return { _stores[index] };
+  }
+
+  void copy(size_t source_index, Container& target_container, size_t target_index);
+  void move(size_t source_index, Container& target_container, size_t target_index);
+
+private:
+
+  template<typename...> struct HasAllComponents;
+
+  size_t                      _capacity = 0;
+  std::vector<size_t>         _holes;
+  std::vector<uint64_t>       _versions;
+
+  TypeIndex                   _type_index;
+  std::vector<ComponentStore> _stores;
+  static ComponentStore       _empty_store;
+
+  template<typename...> friend class EntityView;
+  friend class detail::Handle;
+  template<typename> friend class ComponentPtr;
+  friend class Entity;
+};
+
+
+template<typename... Ts>
+bool Container::has_all_components(size_t index) const {
+  return HasAllComponents<Ts...>()(*this, index);
+}
+
+template<typename T, typename... Ts>
+struct Container::HasAllComponents<T, Ts...> {
+  bool operator () (const Container& container, size_t index) const {
+    return container.has_component<T>(index)
+        && HasAllComponents<Ts...>()(container, index);
+  }
+};
+
+template<>
+struct Container::HasAllComponents<> {
+  bool operator () (const Container&, size_t) const {
+    return true;
+  }
 };
 
 } // namespace secs
+
+#include "container.inline.h"

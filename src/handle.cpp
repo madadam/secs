@@ -1,8 +1,8 @@
+#include "secs/container.h"
 #include "secs/handle.h"
-#include "secs/entity_store.h"
 
 using namespace secs;
 
 bool detail::Handle::valid() const {
-  return _store && _version > 0 && _store->get_version(_index) == _version;
+  return _container && _version > 0 && _container->get_version(_index) == _version;
 }

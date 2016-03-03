@@ -44,7 +44,7 @@ class ConstComponentView : public detail::ComponentView<T> {
 public:
 
 private:
-  friend class EntityStore;
+  friend class Container;
 };
 
 template<typename T>
@@ -71,7 +71,7 @@ public:
   }
 
 private:
-  friend class EntityStore;
+  friend class Container;
 };
 
 } // namespace secs

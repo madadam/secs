@@ -5,8 +5,32 @@
 
 namespace secs {
 
+class Container;
+
 // Type-erased continuous storage for any type.
 class ComponentStore {
+private:
+
+  // Type-erased operations on the objects stored in this ComponentStore.
+  struct BaseOps {
+    virtual void copy( const char* source_data
+                     , size_t      source_index
+                     , Container&  target
+                     , size_t      target_index) = 0;
+    virtual void move( const char* source_data
+                     , size_t      source_index
+                     , Container&  target
+                     , size_t      target_index) = 0;
+    virtual void erase(const char* data, size_t index) = 0;
+  };
+
+  template<typename T>
+  struct Ops : BaseOps {
+    void copy(const char*, size_t, Container&, size_t) override;
+    void move(const char*, size_t, Container&, size_t) override;
+    void erase(const char*, size_t) override;
+  };
+
 public:
 
   ComponentStore() {}
@@ -15,7 +39,7 @@ public:
 
   ~ComponentStore() {
     for (size_t i = 0; i < size(); ++i) {
-      if (_flags[i]) _deleter(_data, i);
+      if (_flags[i]) _ops->erase(_data.get(), i);
     }
   }
 
@@ -32,7 +56,7 @@ public:
 
   template<typename T>
   T* get(size_t index) {
-    return contains(index) ? ptr<T>(_data, index) : nullptr;
+    return contains(index) ? ptr<T>(index) : nullptr;
   }
 
   template<typename T, typename... Args>
@@ -40,22 +64,22 @@ public:
     ensure_space<T>(index);
 
     if (_flags[index]) {
-      ptr<T>(_data, index)->~T();
+      ptr<T>(index)->~T();
     }
 
-    new (ptr<T>(_data, index)) T(std::forward<Args>(args)...);
+    new (ptr<T>(index)) T(std::forward<Args>(args)...);
 
     _flags[index] = true;
 
-    if (!_deleter) {
-      _deleter = [](std::unique_ptr<char[]>& data, size_t index) {
-        ptr<T>(data, index)->~T();
-      };
+    if (!_ops) {
+      _ops = std::make_unique<Ops<T>>();
     }
 
-    return *ptr<T>(_data, index);
+    return *ptr<T>(index);
   }
 
+  void copy(size_t source_index, Container& target_container, size_t target_index);
+  void move(size_t source_index, Container& target_container, size_t target_index);
   void erase(size_t index);
 
 private:
@@ -71,14 +95,29 @@ private:
   }
 
   template<typename T>
-  static T* ptr(std::unique_ptr<char[]>& data, size_t index) {
-    return reinterpret_cast<T*>(reinterpret_cast<Slot<T>*>(data.get()) + index);
+  static const T* ptr(const char* data, size_t index) {
+    return reinterpret_cast<const T*>(reinterpret_cast<const Slot<T>*>(data) + index);
+  }
+
+  template<typename T>
+  static T* ptr(char* data, size_t index) {
+    return reinterpret_cast<T*>(reinterpret_cast<Slot<T>*>(data) + index);
+  }
+
+  template<typename T>
+  const T* ptr(size_t index) const {
+    return ptr<T>(_data.get(), index);
+  }
+
+  template<typename T>
+  T* ptr(size_t index) {
+    return ptr<T>(_data.get(), index);
   }
 
   // TODO: specialize this for PODs using memcpy
   template<typename T>
-  static void move( std::unique_ptr<char[]>&       dst
-                  , std::unique_ptr<char[]>&       src
+  static void move( char*                          dst
+                  , const char*                    src
                   , size_t                         count
                   , const boost::dynamic_bitset<>& flags)
   {
@@ -99,16 +138,16 @@ private:
     _flags.resize(new_size);
 
     auto new_data = std::make_unique<char[]>(slot_size<T>() * new_size);
-    move<T>(new_data, _data, old_size, _flags);
+    move<T>(new_data.get(), _data.get(), old_size, _flags);
 
     _data = std::move(new_data);
   }
 
 private:
 
-  boost::dynamic_bitset<> _flags;
-  std::unique_ptr<char[]> _data;
-  std::function<void(std::unique_ptr<char[]>&, size_t)> _deleter;
+  boost::dynamic_bitset<>  _flags;
+  std::unique_ptr<char[]>  _data;
+  std::unique_ptr<BaseOps> _ops = nullptr;
 };
 
 } // namespace secs

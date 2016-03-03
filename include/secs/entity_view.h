@@ -16,11 +16,11 @@ public:
                                         , Entity>
   {
     bool operator == (iterator other) const {
-      return _store == other._store && _index == other._index;
+      return _container == other._container && _index == other._index;
     }
 
     bool operator != (iterator other) const {
-      return _store != other._store || _index != other._index;
+      return _container != other._container || _index != other._index;
     }
 
     iterator& operator ++ () {
@@ -35,13 +35,13 @@ public:
     }
 
     Entity operator * () const {
-      return _store->get(_index);
+      return _container->get(_index);
     }
 
   private:
 
-    iterator(EntityStore& store, size_t index)
-      : _store(&store)
+    iterator(Container& container, size_t index)
+      : _container(&container)
       , _index(index)
     {
       advance(0);
@@ -51,12 +51,12 @@ public:
       _index += offset;
 
       while (true) {
-        if (_index >= _store->capacity()) {
-          _index = _store->capacity();
+        if (_index >= _container->capacity()) {
+          _index = _container->capacity();
           return;
         }
 
-        if (_store->has_all_components<Ts...>(_index)) {
+        if (_container->has_all_components<Ts...>(_index)) {
           return;
         }
 
@@ -66,8 +66,8 @@ public:
 
   private:
 
-    EntityStore* _store;
-    size_t       _index;
+    Container* _container;
+    size_t     _index;
 
     friend class EntityView;
   };
@@ -77,8 +77,8 @@ public:
   using difference_type = typename iterator::difference_type;
   using size_type       = size_t;
 
-  EntityView(EntityStore& store)
-    : _store(store)
+  EntityView(Container& container)
+    : _container(container)
   {}
 
   EntityView(const EntityView&) = default;
@@ -88,11 +88,11 @@ public:
   EntityView<Ts...>& operator = (EntityView&&) = delete;
 
   iterator begin() const {
-    return iterator(_store, 0);
+    return iterator(_container, 0);
   }
 
   iterator end() const {
-    return iterator(_store, _store.capacity());
+    return iterator(_container, _container.capacity());
   }
 
   template<typename F>
@@ -111,12 +111,12 @@ public:
   }
 
   Entity create() {
-    return _store.create<Ts...>();
+    return _container.create<Ts...>();
   }
 
 private:
 
-  EntityStore& _store;
+  Container& _container;
 };
 
 } // namespace secs
