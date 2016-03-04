@@ -17,6 +17,10 @@ public:
 
   template<typename T> ComponentPtr<T> component() const;
 
+  Container& container() const {
+    return *_container;
+  }
+
   Entity copy();
   Entity copy_to(Container&);
   Entity move_to(Container&);

@@ -60,22 +60,25 @@ public:
   }
 
   template<typename T, typename... Args>
-  T& emplace(size_t index, Args&&... args) {
-    ensure_space<T>(index);
+  void emplace(size_t index, Args&&... args);
 
-    if (_flags[index]) {
-      ptr<T>(index)->~T();
-    }
+  template<typename T> void emplace(size_t index, const T& other);
+  template<typename T> void emplace(size_t index, T& other);
+  template<typename T> void emplace(size_t index, T&& other);
 
-    new (ptr<T>(index)) T(std::forward<Args>(args)...);
+  template<typename T>
+  void reserve_for(size_t index) {
+    if (index < size()) return;
 
-    _flags[index] = true;
+    auto old_size = size();
+    auto new_size = std::max((size_t) std::ceil(GROW_RATE * old_size), index + 1);
 
-    if (!_ops) {
-      _ops = std::make_unique<Ops<T>>();
-    }
+    _flags.resize(new_size);
 
-    return *ptr<T>(index);
+    auto new_data = std::make_unique<char[]>(slot_size<T>() * new_size);
+    move<T>(new_data.get(), _data.get(), old_size, _flags);
+
+    _data = std::move(new_data);
   }
 
   void copy(size_t source_index, Container& target_container, size_t target_index);
@@ -117,7 +120,7 @@ private:
   // TODO: specialize this for PODs using memcpy
   template<typename T>
   static void move( char*                          dst
-                  , const char*                    src
+                  , char*                          src
                   , size_t                         count
                   , const boost::dynamic_bitset<>& flags)
   {
@@ -128,19 +131,28 @@ private:
     }
   }
 
+  // Is inserting item into the given index going to invalidate the source
+  // pointer?
   template<typename T>
-  void ensure_space(size_t index) {
-    if (index < size()) return;
+  bool will_invalidate(size_t index, const T* source) const {
+    return index >= size() && source >= ptr<T>(0) && source < ptr<T>(size());
+  }
 
-    auto old_size = size();
-    auto new_size = std::max((size_t) std::ceil(GROW_RATE * old_size), index + 1);
+  template<typename T, typename... Args>
+  void emplace_without_invalidation_check(size_t index, Args&&... args) {
+    reserve_for<T>(index);
 
-    _flags.resize(new_size);
+    if (_flags[index]) {
+      ptr<T>(index)->~T();
+    }
 
-    auto new_data = std::make_unique<char[]>(slot_size<T>() * new_size);
-    move<T>(new_data.get(), _data.get(), old_size, _flags);
+    new (ptr<T>(index)) T(std::forward<Args>(args)...);
 
-    _data = std::move(new_data);
+    _flags[index] = true;
+
+    if (!_ops) {
+      _ops = std::make_unique<Ops<T>>();
+    }
   }
 
 private:
@@ -149,5 +161,43 @@ private:
   std::unique_ptr<char[]>  _data;
   std::unique_ptr<BaseOps> _ops = nullptr;
 };
+
+template<typename T, typename... Args>
+void ComponentStore::emplace(size_t index, Args&&... args) {
+  emplace_without_invalidation_check<T>(index, std::forward<Args>(args)...);
+}
+
+// These overloads are necessary to prevent invalidating the source reference
+// when the target storage has to be reallocated.
+
+template<typename T>
+void ComponentStore::emplace(size_t index, T& other) {
+  if (will_invalidate(index, &other)) {
+    T temp(other);
+    emplace_without_invalidation_check<T>(index, std::move(temp));
+  } else {
+    emplace_without_invalidation_check<T>(index, other);
+  }
+}
+
+template<typename T>
+void ComponentStore::emplace(size_t index, const T& other) {
+  if (will_invalidate(index, &other)) {
+    T temp(other);
+    emplace_without_invalidation_check<T>(index, std::move(temp));
+  } else {
+    emplace_without_invalidation_check<T>(index, other);
+  }
+}
+
+template<typename T>
+void ComponentStore::emplace(size_t index, T&& other) {
+  if (will_invalidate(index, &other)) {
+    T temp(std::move(other));
+    emplace_without_invalidation_check<T>(index, std::move(temp));
+  } else {
+    emplace_without_invalidation_check<T>(index, std::move(other));
+  }
+}
 
 } // namespace secs

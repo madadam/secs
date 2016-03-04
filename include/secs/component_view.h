@@ -61,9 +61,13 @@ public:
     return _store.template get<T>(index);
   }
 
+  void reserve_for(size_t index) {
+    _store.template reserve_for<T>(index);
+  }
+
   template<typename... Args>
-  T& emplace(size_t index, Args&&... args) {
-    return _store.emplace<T>(index, std::forward<Args>(args)...);
+  void emplace(size_t index, Args&&... args) {
+    _store.emplace<T>(index, std::forward<Args>(args)...);
   }
 
   void erase(size_t index) {

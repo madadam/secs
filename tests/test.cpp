@@ -9,7 +9,41 @@ using namespace secs;
 
 struct Instrument {
   bool visited = false;
+  int data = 0;
+  size_t after_create_count = 0;
+  size_t after_copy_count = 0;
+  size_t after_move_count = 0;
+
+  Instrument(int data = 0) : data(data) {}
+
+  Instrument(const Instrument& other)
+    : visited(other.visited)
+    , data(other.data)
+    , after_create_count(other.after_create_count)
+    , after_copy_count(other.after_copy_count)
+    , after_move_count(other.after_move_count)
+  {}
+
+  Instrument(Instrument&& other)
+    : visited(other.visited)
+    , data(other.data)
+    , after_create_count(other.after_create_count)
+    , after_copy_count(other.after_copy_count)
+    , after_move_count(other.after_move_count)
+  {}
 };
+
+void after_create(ComponentPtr<Instrument> c) {
+  ++c->after_create_count;
+}
+
+void after_copy(ComponentPtr<Instrument> c) {
+  ++c->after_copy_count;
+}
+
+void after_move(ComponentPtr<Instrument> c) {
+  ++c->after_move_count;
+}
 
 struct Position {};
 struct Velocity {};
@@ -39,7 +73,7 @@ TEST_CASE("Create and destroy Entity") {
 
 TEST_CASE("Copy entity") {
   Container container0;
-  auto e0 = container0.create<Position, Velocity>();
+  auto e0 = container0.create<Instrument>(987654);
 
   CHECK(container0.size() == 1);
 
@@ -48,11 +82,9 @@ TEST_CASE("Copy entity") {
 
     CHECK(container0.size() == 2);
 
-    CHECK(e0.component<Position>());
-    CHECK(e0.component<Velocity>());
-
-    CHECK(e1.component<Position>());
-    CHECK(e1.component<Velocity>());
+    CHECK(e0.component<Instrument>());
+    CHECK(e1.component<Instrument>());
+    CHECK(e1.component<Instrument>()->data == 987654);
   }
 
   SECTION("to different Container") {
@@ -62,13 +94,16 @@ TEST_CASE("Copy entity") {
     CHECK(e1 != e0);
     CHECK(container0.size() == 1);
     CHECK(container1.size() == 1);
+
+    CHECK(e1.component<Instrument>());
+    CHECK(e1.component<Instrument>()->data == 987654);
   }
 }
 
 TEST_CASE("Move entity") {
   Container container0;
   Container container1;
-  auto e0 = container0.create<Position, Velocity>();
+  auto e0 = container0.create<Instrument>(987654);
 
   CHECK(container0.size() == 1);
   CHECK(container1.size() == 0);
@@ -78,11 +113,11 @@ TEST_CASE("Move entity") {
   CHECK(e1 != e0);
   CHECK(!e0);
 
-  CHECK(e1.component<Position>());
-  CHECK(e1.component<Velocity>());
-
   CHECK(container0.size() == 0);
   CHECK(container1.size() == 1);
+
+  CHECK(e1.component<Instrument>());
+  CHECK(e1.component<Instrument>()->data == 987654);
 }
 
 TEST_CASE("Get Entities") {
@@ -139,57 +174,70 @@ TEST_CASE("Create Components") {
   }
 }
 
-TEST_CASE("Copy component") {
-  Container container0;
+TEST_CASE("Copy Component in the same Container") {
+  Container container;
 
-  SECTION("between Entities in the same Container") {
-    auto e0 = container0.create<Position, Velocity>();
-    auto e1 = container0.create<Position>();
+  auto e0 = container.create();
+  auto e1 = container.create();
 
-    e0.component<Velocity>().copy_to(e1);
+  e0.component<Instrument>().create(123456);
+  e1.component<Instrument>().create(*e0.component<Instrument>());
 
-    CHECK(e0.component<Velocity>());
-    CHECK(e1.component<Velocity>());
-  }
+  auto i0 = e0.component<Instrument>();
+  auto i1 = e1.component<Instrument>();
 
-  SECTION("between Entities in different Containers") {
-    Container container1;
-    auto e0 = container1.create<Position, Velocity>();
-    auto e1 = container0.create<Position>();
-
-    e0.component<Velocity>().copy_to(e1);
-
-    CHECK(e0.component<Velocity>());
-    CHECK(e1.component<Velocity>());
-  }
+  CHECK(i0);
+  CHECK(i1);
+  CHECK(i1->data == 123456);
 }
 
-TEST_CASE("Move component") {
+TEST_CASE("Copy Component between different Containers") {
   Container container0;
+  Container container1;
 
-  SECTION("between Entities in the same Container") {
-    auto e0 = container0.create<Position, Velocity>();
-    auto e1 = container0.create<Position>();
+  auto e0 = container0.create();
+  auto e1 = container1.create();
 
-    e0.component<Velocity>().move_to(e1);
+  e0.component<Instrument>().create(123456);
+  e1.component<Instrument>().create(*e0.component<Instrument>());
 
-    CHECK(!e0.component<Velocity>());
-    CHECK( e1.component<Velocity>());
-  }
+  auto i0 = e0.component<Instrument>();
+  auto i1 = e1.component<Instrument>();
 
-  SECTION("between Entities in different Containers") {
-    Container container1;
-    auto e0 = container1.create<Position, Velocity>();
-    auto e1 = container0.create<Position>();
-
-    e0.component<Velocity>().move_to(e1);
-
-    CHECK(!e0.component<Velocity>());
-    CHECK( e1.component<Velocity>());
-  }
+  CHECK(i0);
+  CHECK(i1);
+  CHECK(i1->data == 123456);
 }
 
-TEST_CASE("Destroy component") {
+TEST_CASE("Move Component in the same Container") {
+  Container container;
+  auto e0 = container.create();
+  auto e1 = container.create();
+
+  e0.component<Instrument>().create(123456);
+  e1.component<Instrument>().create(std::move(*e0.component<Instrument>()));
+
+  auto i1 = e1.component<Instrument>();
+  CHECK(i1);
+  CHECK(i1->data == 123456);
+}
+
+TEST_CASE("Move Component between different Containers") {
+  Container container0;
+  Container container1;
+
+  auto e0 = container0.create();
+  auto e1 = container1.create();
+
+  e0.component<Instrument>().create(123456);
+  e1.component<Instrument>().create(std::move(*e0.component<Instrument>()));
+
+  auto i1 = e1.component<Instrument>();
+  CHECK(i1);
+  CHECK(i1->data == 123456);
+}
+
+TEST_CASE("Destroy Component") {
   Container container;
   auto e = container.create<Position, Velocity>();
 
@@ -199,7 +247,7 @@ TEST_CASE("Destroy component") {
   CHECK( e.component<Position>());
 }
 
-TEST_CASE("Rich components") {
+TEST_CASE("Non-POD Components") {
   Container container;
 
   auto e0 = container.create();

@@ -63,12 +63,7 @@ private:
   }
 
   template<typename T, typename... Args>
-  T& create_component(size_t index, Args&&... args) {
-    // TODO: emit on_component_create
-    auto cs = components<T>();
-    assert(!cs.contains(index));
-    return cs.emplace(index, std::forward<Args>(args)...);
-  }
+  void create_component(size_t index, Args&&... args);
 
   template<typename T>
   void create_components(size_t index);
