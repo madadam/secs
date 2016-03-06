@@ -1,9 +1,6 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
-
 #include "secs/container.h"
 #include "secs/entity.h"
-#include "secs/type_index.h"
 
 using namespace secs;
 
@@ -260,11 +257,3 @@ TEST_CASE("Non-POD Components") {
     auto name = e.component<Name>()->name;
   }
 }
-
-TEST_CASE("TypeIndex") {
-  TypeIndex ti;
-
-  CHECK(ti.get<Position>() == ti.get<Position>());
-  CHECK(ti.get<Position>() != ti.get<Velocity>());
-}
-
