@@ -135,5 +135,7 @@ TEST_CASE("Non-copyable types") {
   Any a = NonCopyable{};
   Any b = std::move(a);
 
-  // No CHECK here, it's enough if this compiles.
+  std::vector<Any> many;
+  many.push_back(NonCopyable{});
+  many.resize(1024);
 }

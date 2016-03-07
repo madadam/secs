@@ -22,34 +22,32 @@ Entity Container::create() {
 }
 
 void Container::destroy(const Entity& entity) {
-  for (auto& store : _stores) {
-    store.erase(entity._index);
+  for (auto& ops : _ops) {
+    ops.destroy(entity);
   }
 
-  _holes.push_back(entity._index);
-  ++_versions[entity._index];
+  after_destroy(entity._index);
 }
 
-void Container::copy( size_t     source_index
-                    , Container& target_container
-                    , size_t     target_index)
-{
-  assert(get(source_index));
-  assert(target_container.get(target_index));
+void Container::copy(const Entity& source, const Entity& target) {
+  assert(source._container == this);
 
-  for (auto& store : _stores) {
-    store.copy(source_index, target_container, target_index);
+  for (auto& ops : _ops) {
+    ops.copy(source, target);
   }
 }
 
-void Container::move( size_t     source_index
-                    , Container& target_container
-                    , size_t     target_index)
-{
-  assert(get(source_index));
-  assert(target_container.get(target_index));
+void Container::move(const Entity& source, const Entity& target) {
+  assert(source._container == this);
 
-  for (auto& store : _stores) {
-    store.move(source_index, target_container, target_index);
+  for (auto& ops : _ops) {
+    ops.move(source, target);
   }
+
+  after_destroy(source._index);
+}
+
+void Container::after_destroy(size_t index) {
+  _holes.push_back(index);
+  ++_versions[index];
 }

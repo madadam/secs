@@ -33,10 +33,11 @@ Entity Container::create(T&& c, Ts&&... cs) {
 
 template<typename T, typename... Args>
 void Container::create_component(size_t index, Args&&... args) {
-  // TODO: emit on_component_create
   auto cs = components<T>();
   assert(!cs.contains(index));
   cs.emplace(index, std::forward<Args>(args)...);
+  _ops.get<T>().template setup<T>();
+  _event_manager.emit(OnCreate<T>{ get(index).component<T>() });
 }
 
 template<typename T0, typename T1, typename... Ts>
@@ -56,38 +57,58 @@ void Container::create_components(size_t index, T&& c, Ts&&... cs) {
   create_components(index, std::forward<Ts>(cs)...);
 }
 
+template<typename T>
+void Container::destroy_component(size_t index) {
+  auto cs = components<T>();
+  assert(cs.contains(index));
+
+  _event_manager.emit(OnDestroy<T>{ get(index).component<T>() });
+
+  cs.erase(index);
+}
+
+
+// ComponentOps implementation
+template<typename T>
+typename std::enable_if<std::is_copy_constructible<T>::value, void>::type
+ComponentOps::copy(const Entity& source, const Entity& target) {
+  target.component<T>().create(*source.component<T>());
+}
+
+template<typename T>
+typename std::enable_if<!std::is_copy_constructible<T>::value, void>::type
+ComponentOps::copy(const Entity&, const Entity&) {
+  assert(false);
+}
+
+template<typename T>
+void ComponentOps::move(const Entity& source, const Entity& target) {
+  target.component<T>().create(std::move(*source.component<T>()));
+  source.component<T>().destroy();
+}
+
+template<typename T>
+void ComponentOps::destroy(const Entity& entity) {
+  entity.component<T>().destroy();
+}
+
+
+// ComponentPtr implementation
+template<typename T>
+Entity ComponentPtr<T>::entity() const {
+  assert(valid());
+  return _container->get(_index);
+}
+
+
 // ComponentStore implementation
-
 template<typename T>
-void ComponentStore::Ops<T>::copy( const char* source_data
-                                 , size_t      source_index
-                                 , Container&  target
-                                 , size_t      target_index)
-{
-  target.get(target_index)
-        .component<T>()
-        .create(*ptr<T>(source_data, source_index));
-}
-
-template<typename T>
-void ComponentStore::Ops<T>::move( const char* source_data
-                                 , size_t      source_index
-                                 , Container&  target
-                                 , size_t      target_index)
-{
-  target.get(target_index)
-        .component<T>()
-        .create(std::move(*ptr<T>(source_data, source_index)));
-  ptr<T>(source_data, source_index)->~T();
-}
-
-template<typename T>
-void ComponentStore::Ops<T>::erase(const char* data, size_t index) {
+void ComponentStore::destroy(char* data, size_t index) {
   ptr<T>(data, index)->~T();
 }
 
-// Entity implementation
 
+// Entity implementation
 template<typename T>
 ComponentPtr<T> Entity::component() const {
   assert(valid());

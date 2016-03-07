@@ -3,10 +3,11 @@
 #include <cassert>
 #include <utility>
 #include "secs/container.h"
-#include "secs/entity.h"
 #include "secs/handle.h"
 
 namespace secs {
+
+class Entity;
 
 template<typename T>
 class ComponentPtr : public Handle<ComponentPtr<T>> {
@@ -61,10 +62,7 @@ public:
   }
 
   // Access the Entity that owns this Component.
-  Entity entity() const {
-    assert(valid());
-    return _container->get(_index);
-  }
+  Entity entity() const;
 
   // Access other Components on the same Entity that owns this Component.
   template<typename U>

@@ -1,46 +1,26 @@
 #include "catch.hpp"
 #include "secs/container.h"
 #include "secs/entity.h"
+#include "secs/lifetime_subscriber.h"
 
 using namespace secs;
 
 struct Instrument {
   bool visited = false;
   int data = 0;
-  size_t after_create_count = 0;
-  size_t after_copy_count = 0;
-  size_t after_move_count = 0;
 
   Instrument(int data = 0) : data(data) {}
 
   Instrument(const Instrument& other)
     : visited(other.visited)
     , data(other.data)
-    , after_create_count(other.after_create_count)
-    , after_copy_count(other.after_copy_count)
-    , after_move_count(other.after_move_count)
   {}
 
   Instrument(Instrument&& other)
     : visited(other.visited)
     , data(other.data)
-    , after_create_count(other.after_create_count)
-    , after_copy_count(other.after_copy_count)
-    , after_move_count(other.after_move_count)
   {}
 };
-
-void after_create(ComponentPtr<Instrument> c) {
-  ++c->after_create_count;
-}
-
-void after_copy(ComponentPtr<Instrument> c) {
-  ++c->after_copy_count;
-}
-
-void after_move(ComponentPtr<Instrument> c) {
-  ++c->after_move_count;
-}
 
 struct Position {};
 struct Velocity {};
@@ -51,17 +31,33 @@ public:
   std::string name;
 };
 
+class PositionSubscriber : public LifetimeSubscriber<Position> {
+public:
+  int creates = 0;
+  int destroys = 0;
+
+  void on_create(ComponentPtr<Position>) override {
+    ++creates;
+  }
+
+  void on_destroy(ComponentPtr<Position>) override {
+    ++destroys;
+  }
+};
+
 TEST_CASE("Create and destroy Entity") {
   Container container;
   CHECK(container.size() == 0);
 
   auto e0 = container.create();
+  CHECK(e0);
   CHECK(container.size() == 1);
 
   auto e1 = container.create();
   CHECK(container.size() == 2);
 
   e0.destroy();
+  CHECK(!e0);
   CHECK(container.size() == 1);
 
   e1.destroy();
@@ -256,4 +252,64 @@ TEST_CASE("Non-POD Components") {
   for (auto e : container.all<Name>()) {
     auto name = e.component<Name>()->name;
   }
+}
+
+TEST_CASE("Lifetime events") {
+  Container container;
+  PositionSubscriber subscriber;
+
+  container.subscribe<Position>(subscriber);
+
+  CHECK(subscriber.creates  == 0);
+  CHECK(subscriber.destroys == 0);
+
+  auto e0 = container.create();
+  CHECK(subscriber.creates  == 0);
+  CHECK(subscriber.destroys == 0);
+
+  e0.component<Position>().create();
+  CHECK(subscriber.creates  == 1);
+  CHECK(subscriber.destroys == 0);
+
+  auto e1 = container.create<Position>();
+  CHECK(subscriber.creates  == 2);
+  CHECK(subscriber.destroys == 0);
+
+  container.all<Position>().create();
+  CHECK(subscriber.creates  == 3);
+  CHECK(subscriber.destroys == 0);
+
+  e1.copy();
+  CHECK(subscriber.creates  == 4);
+  CHECK(subscriber.destroys == 0);
+
+  e1.component<Position>().destroy();
+  CHECK(subscriber.creates  == 4);
+  CHECK(subscriber.destroys == 1);
+
+  e0.destroy();
+  CHECK(subscriber.creates  == 4);
+  CHECK(subscriber.destroys == 2);
+}
+
+TEST_CASE("Lifetime events on move") {
+  Container container0;
+  PositionSubscriber subscriber0;
+  container0.subscribe<Position>(subscriber0);
+
+  Container container1;
+  PositionSubscriber subscriber1;
+  container1.subscribe<Position>(subscriber1);
+
+  auto e0 = container0.create<Position>();
+  CHECK(subscriber0.creates  == 1);
+  CHECK(subscriber0.destroys == 0);
+  CHECK(subscriber1.creates  == 0);
+  CHECK(subscriber1.destroys == 0);
+
+  e0.move_to(container1);
+  CHECK(subscriber0.creates  == 1);
+  CHECK(subscriber0.destroys == 1);
+  CHECK(subscriber1.creates  == 1);
+  CHECK(subscriber1.destroys == 0);
 }

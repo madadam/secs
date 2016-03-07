@@ -5,32 +5,10 @@
 
 namespace secs {
 
-class Container;
+class Entity;
 
 // Type-erased continuous storage for any type.
 class ComponentStore {
-private:
-
-  // Type-erased operations on the objects stored in this ComponentStore.
-  struct BaseOps {
-    virtual void copy( const char* source_data
-                     , size_t      source_index
-                     , Container&  target
-                     , size_t      target_index) = 0;
-    virtual void move( const char* source_data
-                     , size_t      source_index
-                     , Container&  target
-                     , size_t      target_index) = 0;
-    virtual void erase(const char* data, size_t index) = 0;
-  };
-
-  template<typename T>
-  struct Ops : BaseOps {
-    void copy(const char*, size_t, Container&, size_t) override;
-    void move(const char*, size_t, Container&, size_t) override;
-    void erase(const char*, size_t) override;
-  };
-
 public:
 
   ComponentStore() {}
@@ -39,7 +17,7 @@ public:
 
   ~ComponentStore() {
     for (size_t i = 0; i < size(); ++i) {
-      if (_flags[i]) _ops->erase(_data.get(), i);
+      if (_flags[i]) _destroy(_data.get(), i);
     }
   }
 
@@ -81,9 +59,22 @@ public:
     _data = std::move(new_data);
   }
 
-  void copy(size_t source_index, Container& target_container, size_t target_index);
-  void move(size_t source_index, Container& target_container, size_t target_index);
+  template<typename T>
+  void erase(size_t index) {
+    if (!contains(index)) return;
+
+    ptr<T>(index)->~T();
+    _flags[index] = false;
+  }
+
+  void copy(size_t source_index, const Entity& target) const;
+  void move(size_t source_index, const Entity& target);
   void erase(size_t index);
+
+private:
+
+  using Destroy = void (*)(char*, size_t);
+  template<typename T> static void destroy(char*, size_t);
 
 private:
 
@@ -131,6 +122,9 @@ private:
     }
   }
 
+  // template<typename>
+  // static void
+
   // Is inserting item into the given index going to invalidate the source
   // pointer?
   template<typename T>
@@ -149,17 +143,14 @@ private:
     new (ptr<T>(index)) T(std::forward<Args>(args)...);
 
     _flags[index] = true;
-
-    if (!_ops) {
-      _ops = std::make_unique<Ops<T>>();
-    }
+    _destroy = &destroy<T>;
   }
 
 private:
 
   boost::dynamic_bitset<>  _flags;
   std::unique_ptr<char[]>  _data;
-  std::unique_ptr<BaseOps> _ops = nullptr;
+  Destroy                  _destroy = nullptr;
 };
 
 template<typename T, typename... Args>

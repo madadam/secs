@@ -9,13 +9,7 @@ Any::Any(const Any& other)
   , _copy(other._copy)
 {}
 
-Any::Any(Any& other)
-  : _store(copy(other))
-  , _destroy(other._destroy)
-  , _copy(other._copy)
-{}
-
-Any::Any(Any&& other)
+Any::Any(Any&& other) noexcept
   : _store(other._store)
   , _destroy(other._destroy)
   , _copy(other._copy)

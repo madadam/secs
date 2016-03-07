@@ -3,9 +3,12 @@
 #include <cassert>
 #include <vector>
 
+#include "secs/component_ops.h"
 #include "secs/component_store.h"
 #include "secs/component_view.h"
+#include "secs/lifetime_subscriber.h"
 #include "secs/type_index.h"
+#include "secs/type_keyed_map.h"
 
 namespace secs {
 namespace detail { class Handle; }
@@ -24,7 +27,7 @@ public:
   template<typename T, typename... Ts>
   Entity create();
 
-  // Create new Entity with the given Components.
+  // Create new Entity with copies or moves of the given Components.
   template<typename T, typename... Ts>
   Entity create(T&&, Ts&&...);
 
@@ -38,6 +41,18 @@ public:
   }
 
   Entity get(size_t index);
+
+  template<typename T>
+  void subscribe(LifetimeSubscriber<T>& subscriber) {
+    _event_manager.subscribe<OnCreate<T>>(subscriber);
+    _event_manager.subscribe<OnDestroy<T>>(subscriber);
+  }
+
+  template<typename T>
+  void unsubscribe(LifetimeSubscriber<T>& subscriber) {
+    _event_manager.unsubscribe<OnCreate<T>>(subscriber);
+    _event_manager.unsubscribe<OnDestroy<T>>(subscriber);
+  }
 
 private:
 
@@ -76,11 +91,7 @@ private:
   void create_components(size_t) {}
 
   template<typename T>
-  void destroy_component(size_t index) {
-    auto cs = components<T>();
-    assert(cs.contains(index));
-    cs.erase(index);
-  }
+  void destroy_component(size_t index);
 
   template<typename T>
   ConstComponentView<const T> components() const {
@@ -104,8 +115,10 @@ private:
     return { _stores[index] };
   }
 
-  void copy(size_t source_index, Container& target_container, size_t target_index);
-  void move(size_t source_index, Container& target_container, size_t target_index);
+  void copy(const Entity& source, const Entity& target);
+  void move(const Entity& source, const Entity& target);
+
+  void after_destroy(size_t index);
 
 private:
 
@@ -118,6 +131,10 @@ private:
   TypeIndex                   _type_index;
   std::vector<ComponentStore> _stores;
   static ComponentStore       _empty_store;
+
+  TypeKeyedMap<ComponentOps>  _ops;
+
+  EventManager                _event_manager;
 
   template<typename...> friend class EntityView;
   friend class detail::Handle;

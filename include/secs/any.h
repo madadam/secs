@@ -11,6 +11,13 @@
 
 namespace secs {
 
+class Any;
+
+namespace detail {
+template<typename T>
+constexpr bool is_any = std::is_same<typename std::decay<T>::type, Any>::value;
+}
+
 class Any {
 private:
 
@@ -38,7 +45,8 @@ public:
   Any() {}
 
   template<typename T>
-  Any(T&& value)
+  Any( T&& value
+     , typename std::enable_if<!detail::is_any<T>, void*>::type = nullptr)
     : _store(new T(std::forward<T>(value)))
     , _destroy(&destroy<T>)
     , _copy(&copy<T>)
@@ -49,17 +57,13 @@ public:
   }
 
   Any(const Any&);
-  Any(Any&);
-  Any(Any&&);
+  Any(Any&&) noexcept;
 
   Any& operator = (const Any&);
   Any& operator = (Any&&);
 
   template<typename T>
-  typename std::enable_if<
-      !std::is_same<typename std::decay<T>::type, Any>::value
-    , Any&
-  >::type
+  typename std::enable_if<!detail::is_any<T>, Any&>::type
   operator = (T&& value) {
     reset();
 
@@ -79,6 +83,15 @@ public:
   template<typename T>
   T& get() {
     assert(!empty());
+    return *reinterpret_cast<T*>(_store);
+  }
+
+  template<typename T>
+  T& ensure() {
+    if (empty()) {
+      *this = T();
+    }
+
     return *reinterpret_cast<T*>(_store);
   }
 

@@ -71,7 +71,7 @@ public:
   }
 
   void erase(size_t index) {
-    _store.erase(index);
+    _store.template erase<T>(index);
   }
 
 private:
