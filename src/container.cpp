@@ -2,8 +2,6 @@
 
 using namespace secs;
 
-ComponentStore Container::_empty_store;
-
 Entity Container::create() {
   size_t index;
 

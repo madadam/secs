@@ -5,7 +5,6 @@
 
 #include "secs/component_ops.h"
 #include "secs/component_store.h"
-#include "secs/component_view.h"
 #include "secs/lifetime_subscriber.h"
 #include "secs/type_index.h"
 #include "secs/type_keyed_map.h"
@@ -65,16 +64,44 @@ private:
   }
 
   template<typename T>
+  const ComponentStore<T>* find_store() const {
+    return _stores.find<ComponentStore<T>>();
+  }
+
+  template<typename T>
+  ComponentStore<T>* find_store() {
+    return _stores.find<ComponentStore<T>>();
+  }
+
+  template<typename T>
+  const ComponentStore<T>& get_store() const {
+    auto store = _stores.find<ComponentStore<T>>();
+    assert(store);
+    return *store;
+  }
+
+  template<typename T>
+  ComponentStore<T>& get_store() {
+    return _stores.get<ComponentStore<T>>();
+  }
+
+  template<typename T>
   bool has_component(size_t index) const {
-    return components<T>().contains(index);
+    auto store = find_store<T>();
+    return store && store->contains(index);
   }
 
   template<typename... Ts>
   bool has_all_components(size_t index) const;
 
   template<typename T>
+  const T* get_component(size_t index) const {
+    return get_store<T>().get(index);
+  }
+
+  template<typename T>
   T* get_component(size_t index) {
-    return components<T>().get(index);
+    return get_store<T>().get(index);
   }
 
   template<typename T, typename... Args>
@@ -93,28 +120,6 @@ private:
   template<typename T>
   void destroy_component(size_t index);
 
-  template<typename T>
-  ConstComponentView<const T> components() const {
-    auto index = _type_index.get<T>();
-
-    if (index >= _stores.size()) {
-      return { _empty_store };
-    } else {
-      return { _stores[index] };
-    }
-  }
-
-  template<typename T>
-  MutableComponentView<T> components() {
-    auto index = _type_index.get<T>();
-
-    if (index >= _stores.size()) {
-      _stores.resize(index + 1);
-    }
-
-    return { _stores[index] };
-  }
-
   void copy(const Entity& source, const Entity& target);
   void move(const Entity& source, const Entity& target);
 
@@ -128,12 +133,8 @@ private:
   std::vector<size_t>         _holes;
   std::vector<uint64_t>       _versions;
 
-  TypeIndex                   _type_index;
-  std::vector<ComponentStore> _stores;
-  static ComponentStore       _empty_store;
-
+  HeterogeneousSet            _stores;
   TypeKeyedMap<ComponentOps>  _ops;
-
   EventManager                _event_manager;
 
   template<typename...> friend class EntityView;

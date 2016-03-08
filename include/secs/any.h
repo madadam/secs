@@ -82,12 +82,6 @@ public:
 
   template<typename T>
   T& get() {
-    assert(!empty());
-    return *reinterpret_cast<T*>(_store);
-  }
-
-  template<typename T>
-  T& ensure() {
     if (empty()) {
       *this = T();
     }

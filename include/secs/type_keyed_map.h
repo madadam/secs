@@ -38,29 +38,33 @@ public:
 
   template<typename T>
   V& get() {
-    auto index = _type_index.get<T>();
-    reserve(index);
+    auto index = reserve<T>();
     return _values[index];
   }
 
   template<typename T>
   void set(const V& value) {
-    reserve(index);
+    auto index = reserve<T>();
     _values[index] = value;
   }
 
   template<typename T>
   void set(V&& value) {
-    reserve(index);
+    auto index = reserve<T>();
     _values[index] = std::move(value);
   }
 
 private:
 
-  void reserve(size_t index) {
+  template<typename T>
+  size_t reserve() {
+    auto index = _type_index.get<T>();
+
     if (index >= _values.size()) {
       _values.resize(index + 1);
     }
+
+    return index;
   }
 
 private:

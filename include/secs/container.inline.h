@@ -33,10 +33,11 @@ Entity Container::create(T&& c, Ts&&... cs) {
 
 template<typename T, typename... Args>
 void Container::create_component(size_t index, Args&&... args) {
-  auto cs = components<T>();
-  assert(!cs.contains(index));
-  cs.emplace(index, std::forward<Args>(args)...);
+  auto& store = get_store<T>();
+  assert(!store.contains(index));
+
   _ops.get<T>().template setup<T>();
+  store.emplace(index, std::forward<Args>(args)...);
   _event_manager.emit(OnCreate<T>{ get(index).component<T>() });
 }
 
@@ -59,12 +60,11 @@ void Container::create_components(size_t index, T&& c, Ts&&... cs) {
 
 template<typename T>
 void Container::destroy_component(size_t index) {
-  auto cs = components<T>();
-  assert(cs.contains(index));
+  auto& store = get_store<T>();
+  assert(store.contains(index));
 
   _event_manager.emit(OnDestroy<T>{ get(index).component<T>() });
-
-  cs.erase(index);
+  store.erase(index);
 }
 
 
@@ -98,13 +98,6 @@ template<typename T>
 Entity ComponentPtr<T>::entity() const {
   assert(valid());
   return _container->get(_index);
-}
-
-
-// ComponentStore implementation
-template<typename T>
-void ComponentStore::destroy(char* data, size_t index) {
-  ptr<T>(data, index)->~T();
 }
 
 

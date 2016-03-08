@@ -95,13 +95,6 @@ public:
     return iterator(_container, _container.capacity());
   }
 
-  template<typename F>
-  void each(F&& f) {
-    for (auto entity : *this) {
-      f(entity, entity.template get_component<Ts>()...);
-    }
-  }
-
   bool empty() const {
     return begin() == end();
   }

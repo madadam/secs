@@ -1,7 +1,7 @@
 #pragma once
 
-#include "secs/any.h"
-#include "secs/type_index.h"
+#include <vector>
+#include "secs/heterogeneous_set.h"
 
 namespace secs {
 
@@ -137,7 +137,7 @@ public:
     subscriber._publisher = nullptr;
   }
 
-  void emit(E event) {
+  void emit(E event) const {
     for (auto subscriber : _subscribers) {
       subscriber->receive(event);
     }
@@ -156,36 +156,24 @@ public:
 
   template<typename E>
   void subscribe(Subscriber<E>& subscriber) {
-    publisher<E>().subscribe(subscriber);
+    _publishers.get<Publisher<E>>().subscribe(subscriber);
   }
 
   template<typename E>
   void unsubscribe(Subscriber<E>& subscriber) {
-    publisher<E>().unsubscribe(subscriber);
+    _publishers.get<Publisher<E>>().unsubscribe(subscriber);
   }
 
   template<typename E>
-  void emit(E event) {
-    publisher<E>().emit(event);
-  }
-
-private:
-
-  template<typename E>
-  Publisher<E>& publisher() {
-    auto index = _type_index.get<E>();
-
-    if (index >= _publishers.size()) {
-      _publishers.resize(index + 1);
+  void emit(E event) const {
+    if (auto p = _publishers.find<Publisher<E>>()) {
+      p->emit(event);
     }
-
-    return _publishers[index].template ensure<Publisher<E>>();
   }
 
 private:
 
-  TypeIndex        _type_index;
-  std::vector<Any> _publishers;
+  HeterogeneousSet _publishers;
 };
 
 } // namespace secs
