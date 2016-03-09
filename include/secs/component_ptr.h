@@ -9,6 +9,11 @@ namespace secs {
 template<typename T>
 class ComponentPtr {
 public:
+  ComponentPtr(std::nullptr_t)
+    : _store(nullptr)
+    , _index(0)
+    , _version(0)
+  {}
 
   explicit operator bool () const {
     return _store && _version > 0 && _store->contains(_index, _version);
@@ -22,6 +27,10 @@ public:
   T* operator -> () const {
     assert(*this);
     return &_store->get(_index);
+  }
+
+  T* get() const {
+    return *this ? &_store->get(_index) : nullptr;
   }
 
 private:

@@ -23,8 +23,8 @@ public:
   // Destroy Entity.
   void destroy(const Entity& entity);
 
-  template<typename... Ts, typename F>
-  void each(F&&);
+  template<typename... Ts>
+  EntityView<Ts...> all();
 
   size_t size() const {
     return _capacity - _holes.size();

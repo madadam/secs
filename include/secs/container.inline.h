@@ -3,23 +3,16 @@
 #include "secs/component_ptr.h"
 #include "secs/container.h"
 #include "secs/entity.h"
+#include "secs/entity_view.h"
 #include "secs/lifetime_subscriber.h"
 #include "secs/misc.h"
 
 namespace secs {
 
 // Container implementation
-template<typename... Ts, typename F>
-void Container::each(F&& f) {
-  static_assert(is_callable<F, Entity, Ts&...>, "f is not callable with (Entity, Ts&...)");
-
-  auto ss = _stores.slice<ComponentStore<Ts>...>();
-
-  for (size_t i = 0; i < _capacity; ++i) {
-    if (all(ss, [i](auto& store) { return store.contains(i); })) {
-      f(get(i), std::get<ComponentStore<Ts>&>(ss).get(i)...);
-    }
-  }
+template<typename... Ts>
+EntityView<Ts...> Container::all() {
+  return { *this };
 }
 
 inline Entity Container::get(size_t index) {

@@ -74,12 +74,12 @@ public:
   }
 
   T& get(size_t index) {
-    assert(index < size());
+    assert(contains(index));
     return *ptr(index);
   }
 
   const T& get(size_t index) const {
-    assert(index < size());
+    assert(contains(index));
     return *ptr(index);
   }
 

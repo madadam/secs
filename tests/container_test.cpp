@@ -3,6 +3,9 @@
 #include "secs/entity.h"
 #include "secs/lifetime_subscriber.h"
 
+// DEBUG
+#include <iostream>
+
 using namespace secs;
 
 struct Position {
@@ -35,6 +38,9 @@ public:
     ++destroys;
   }
 };
+
+template<typename T>
+void unused(T) {}
 
 TEST_CASE("Create and destroy Entity") {
   Container container;
@@ -109,47 +115,50 @@ TEST_CASE("Move entity") {
   CHECK(e1.component<Position>()->y == 456);
 }
 
-TEST_CASE("each()") {
+TEST_CASE("Iterate over entities") {
   Container container;
   size_t counter = 0;
 
-  container.each<>([&](auto) {
+  for (auto c : container.all<>()) {
+    unused(c);
     ++counter;
-  });
+  }
   CHECK(counter == 0);
 
   auto e0 = container.create();
   e0.create_component<Position>(123, 456);
 
   counter = 0;
-  container.each<>([&](auto) {
+  for (auto c : container.all<>()) {
+    unused(c);
     ++counter;
-  });
+  }
   CHECK(counter == 1);
 
   counter = 0;
-  container.each<Position>([&](auto, auto&) {
+  for (auto c : container.all<Position>()) {
+    unused(c);
     ++counter;
-  });
+  }
   CHECK(counter == 1);
 
   counter = 0;
-  container.each<Position>([&](auto entity, auto&) {
-    if (entity == e0) ++counter;
-  });
+  for (auto c : container.all<Position>()) {
+    if (c.entity == e0) ++counter;
+  }
   CHECK(counter == 1);
 
   counter = 0;
-  container.each<Position>([&](auto, const auto& position) {
-    if (position.x == 123 && position.y == 456) {
+  for (auto c : container.all<Position>()) {
+    if (c.get<Position>().x == 123 && c.get<Position>().y == 456) {
       ++counter;
     }
-  });
+  }
   CHECK(counter == 1);
 
-  container.each<Position>([&](auto, auto& position) {
-    position.x = 789;
-  });
+  for (auto c : container.all<Position>()) {
+    c.get<Position>().x = 789;
+  }
   CHECK(e0.component<Position>()->x == 789);
 
   auto e1 = container.create();
@@ -157,16 +166,19 @@ TEST_CASE("each()") {
   e1.create_component<Velocity>();
 
   counter = 0;
-  container.each<Position>([&](auto, auto&) {
+  for (auto c : container.all<Position>()) {
+    unused(c);
     ++counter;
-  });
+  }
   CHECK(counter == 2);
 
   counter = 0;
-  container.each<Position, Velocity>([&](auto, auto&, auto&) {
+  for (auto c : container.all<Position, Velocity>()) {
+    unused(c);
     ++counter;
-  });
+  }
   CHECK(counter == 1);
+
 }
 
 TEST_CASE("Create Components") {
@@ -268,8 +280,9 @@ TEST_CASE("Non-POD Components") {
   e0.create_component<Name>("foo");
   e1.create_component<Name>("bar");
 
-  container.each<Name>([](auto, auto&) {
-  });
+  for (auto c : container.all<Name>()) {
+    auto name = c.get<Name>().name;
+  }
 }
 
 TEST_CASE("Lifetime events") {
