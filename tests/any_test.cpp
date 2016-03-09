@@ -52,22 +52,23 @@ struct NonCopyable {
 
 TEST_CASE("POD types") {
   Any a;
-  CHECK(a.empty());
+  CHECK(!a);
   CHECK(!a.contains<int>());
 
   a = 123456;
-  CHECK(!a.empty());
+  CHECK(a);
   CHECK(a.contains<int>());
   CHECK(a.get<int>() == 123456);
 
   Any b = 654321;
-  CHECK(!b.empty());
+  CHECK(b);
   CHECK(b.contains<int>());
   CHECK(b.get<int>() == 654321);
 
-  Any c = b;
+  Any c = std::move(b);
   CHECK(c.contains<int>());
-  CHECK(c.get<int>() == b.get<int>());
+  CHECK(c.get<int>() == 654321);
+  CHECK(!b);
 }
 
 TEST_CASE("Non-POD types") {
@@ -82,7 +83,7 @@ TEST_CASE("Non-POD types") {
     i.on_destroy = [&]() { ++destroys; };
 
     Any a = std::move(i);
-    CHECK(!a.empty());
+    CHECK(a);
     CHECK(a.contains<Instrument>());
     CHECK(a.get<Instrument>().data == "hello world");
 
@@ -90,45 +91,31 @@ TEST_CASE("Non-POD types") {
     CHECK(moves    == 1);
     CHECK(destroys == 0);
 
-    Any b = a;
-    CHECK(copies   == 1);
+    Any b = std::move(a);
+    CHECK(copies   == 0);
     CHECK(moves    == 1);
     CHECK(destroys == 0);
     CHECK(b.get<Instrument>().data == "hello world");
 
-    Any c = std::move(b);
-    CHECK(copies   == 1);
+    Any c;
+    c = std::move(b);
+    CHECK(copies   == 0);
     CHECK(moves    == 1);
     CHECK(destroys == 0);
-    CHECK(b.empty());
     CHECK(c.get<Instrument>().data == "hello world");
 
-    Any d;
-    d = c;
-    CHECK(copies   == 2);
+    // Move moved value
+    Any d = std::move(a);
+    CHECK(copies   == 0);
     CHECK(moves    == 1);
     CHECK(destroys == 0);
-    CHECK(d.get<Instrument>().data == "hello world");
+    CHECK(!d);
 
-    Any e;
-    e = std::move(d);
-    CHECK(copies   == 2);
-    CHECK(moves    == 1);
-    CHECK(destroys == 0);
-    CHECK(e.get<Instrument>().data == "hello world");
-
-    // Copy moved value
-    Any f = b;
-    CHECK(copies   == 2);
-    CHECK(moves    == 1);
-    CHECK(destroys == 0);
-    CHECK(f.empty());
-
-    e.reset();
+    c.reset();
     CHECK(destroys == 1);
   }
 
-  CHECK(destroys == 3);
+  CHECK(destroys == 1);
 }
 
 TEST_CASE("Non-copyable types") {

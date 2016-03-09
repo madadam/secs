@@ -5,24 +5,15 @@
 
 using namespace secs;
 
-struct Instrument {
-  bool visited = false;
-  int data = 0;
+struct Position {
+  int x;
+  int y;
 
-  Instrument(int data = 0) : data(data) {}
-
-  Instrument(const Instrument& other)
-    : visited(other.visited)
-    , data(other.data)
-  {}
-
-  Instrument(Instrument&& other)
-    : visited(other.visited)
-    , data(other.data)
+  Position(int x = 0, int y = 0)
+    : x(x), y(y)
   {}
 };
 
-struct Position {};
 struct Velocity {};
 
 struct Name {
@@ -36,11 +27,11 @@ public:
   int creates = 0;
   int destroys = 0;
 
-  void on_create(ComponentPtr<Position>) override {
+  void on_create(Entity, ComponentPtr<Position>) override {
     ++creates;
   }
 
-  void on_destroy(ComponentPtr<Position>) override {
+  void on_destroy(Entity, ComponentPtr<Position>) override {
     ++destroys;
   }
 };
@@ -66,7 +57,8 @@ TEST_CASE("Create and destroy Entity") {
 
 TEST_CASE("Copy entity") {
   Container container0;
-  auto e0 = container0.create<Instrument>(987654);
+  auto e0 = container0.create();
+  e0.create_component<Position>(123, 456);
 
   CHECK(container0.size() == 1);
 
@@ -75,9 +67,10 @@ TEST_CASE("Copy entity") {
 
     CHECK(container0.size() == 2);
 
-    CHECK(e0.component<Instrument>());
-    CHECK(e1.component<Instrument>());
-    CHECK(e1.component<Instrument>()->data == 987654);
+    CHECK(e0.component<Position>());
+    CHECK(e1.component<Position>());
+    CHECK(e1.component<Position>()->x == 123);
+    CHECK(e1.component<Position>()->y == 456);
   }
 
   SECTION("to different Container") {
@@ -88,15 +81,17 @@ TEST_CASE("Copy entity") {
     CHECK(container0.size() == 1);
     CHECK(container1.size() == 1);
 
-    CHECK(e1.component<Instrument>());
-    CHECK(e1.component<Instrument>()->data == 987654);
+    CHECK(e1.component<Position>());
+    CHECK(e1.component<Position>()->x == 123);
+    CHECK(e1.component<Position>()->y == 456);
   }
 }
 
 TEST_CASE("Move entity") {
   Container container0;
   Container container1;
-  auto e0 = container0.create<Instrument>(987654);
+  auto e0 = container0.create();
+  e0.create_component<Position>(123, 456);
 
   CHECK(container0.size() == 1);
   CHECK(container1.size() == 0);
@@ -109,62 +104,80 @@ TEST_CASE("Move entity") {
   CHECK(container0.size() == 0);
   CHECK(container1.size() == 1);
 
-  CHECK(e1.component<Instrument>());
-  CHECK(e1.component<Instrument>()->data == 987654);
+  CHECK(e1.component<Position>());
+  CHECK(e1.component<Position>()->x == 123);
+  CHECK(e1.component<Position>()->y == 456);
 }
 
-TEST_CASE("Get Entities") {
+TEST_CASE("each()") {
   Container container;
+  size_t counter = 0;
 
-  auto b = container.all<Instrument, Position>().empty();
-  CHECK(b);
+  container.each<>([&](auto) {
+    ++counter;
+  });
+  CHECK(counter == 0);
 
-  auto e0 = container.create<Instrument, Position, Velocity>();
-  auto e1 = container.create<Instrument, Position>();
+  auto e0 = container.create();
+  e0.create_component<Position>(123, 456);
 
-  auto b0 = container.all<>().empty();
-  auto b1 = container.all<Instrument>().empty();
-  auto b2 = container.all<Instrument, Position>().empty();
-  auto b3 = container.all<Instrument, Position, Velocity>().empty();
-  CHECK(!b0);
-  CHECK(!b1);
-  CHECK(!b2);
-  CHECK(!b3);
+  counter = 0;
+  container.each<>([&](auto) {
+    ++counter;
+  });
+  CHECK(counter == 1);
 
-  for (auto e : container.all<Instrument, Velocity>()) {
-    e.component<Instrument>()->visited = true;
-  }
+  counter = 0;
+  container.each<Position>([&](auto, auto&) {
+    ++counter;
+  });
+  CHECK(counter == 1);
 
-  CHECK(e0.component<Instrument>()->visited);
-  CHECK(!e1.component<Instrument>()->visited);
+  counter = 0;
+  container.each<Position>([&](auto entity, auto&) {
+    if (entity == e0) ++counter;
+  });
+  CHECK(counter == 1);
+
+  counter = 0;
+  container.each<Position>([&](auto, const auto& position) {
+    if (position.x == 123 && position.y == 456) {
+      ++counter;
+    }
+  });
+  CHECK(counter == 1);
+
+  container.each<Position>([&](auto, auto& position) {
+    position.x = 789;
+  });
+  CHECK(e0.component<Position>()->x == 789);
+
+  auto e1 = container.create();
+  e1.create_component<Position>();
+  e1.create_component<Velocity>();
+
+  counter = 0;
+  container.each<Position>([&](auto, auto&) {
+    ++counter;
+  });
+  CHECK(counter == 2);
+
+  counter = 0;
+  container.each<Position, Velocity>([&](auto, auto&, auto&) {
+    ++counter;
+  });
+  CHECK(counter == 1);
 }
 
 TEST_CASE("Create Components") {
   Container container;
+  auto e = container.create();
+  e.create_component<Position>();
+  CHECK(e.component<Position>());
 
-  SECTION(".component().create() and .component().or_create()") {
-    auto e = container.create();
-    e.component<Position>().create();
-    CHECK(e.component<Position>());
-
-    auto& c0 = *e.component<Velocity>().or_create();
-    auto& c1 = *e.component<Velocity>().or_create();
-    CHECK(&c0 == &c1);
-  }
-
-  SECTION("create Entity with Component types") {
-    auto e = container.create<Position, Velocity>();
-    CHECK(e.component<Position>());
-    CHECK(e.component<Velocity>());
-  }
-
-  SECTION("create Entity with Component values") {
-    Position c0;
-    Velocity c1;
-    auto e = container.create(c0, c1);
-    CHECK(e.component<Position>());
-    CHECK(e.component<Velocity>());
-  }
+  auto c0 = e.ensure_component<Velocity>();
+  auto c1 = e.ensure_component<Velocity>();
+  CHECK(c0 == c1);
 }
 
 TEST_CASE("Copy Component in the same Container") {
@@ -173,15 +186,16 @@ TEST_CASE("Copy Component in the same Container") {
   auto e0 = container.create();
   auto e1 = container.create();
 
-  e0.component<Instrument>().create(123456);
-  e1.component<Instrument>().create(*e0.component<Instrument>());
+  e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(*e0.component<Position>());
 
-  auto i0 = e0.component<Instrument>();
-  auto i1 = e1.component<Instrument>();
+  auto i0 = e0.component<Position>();
+  auto i1 = e1.component<Position>();
 
   CHECK(i0);
   CHECK(i1);
-  CHECK(i1->data == 123456);
+  CHECK(i1->x == 123);
+  CHECK(i1->y == 456);
 }
 
 TEST_CASE("Copy Component between different Containers") {
@@ -191,15 +205,16 @@ TEST_CASE("Copy Component between different Containers") {
   auto e0 = container0.create();
   auto e1 = container1.create();
 
-  e0.component<Instrument>().create(123456);
-  e1.component<Instrument>().create(*e0.component<Instrument>());
+  e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(*e0.component<Position>());
 
-  auto i0 = e0.component<Instrument>();
-  auto i1 = e1.component<Instrument>();
+  auto i0 = e0.component<Position>();
+  auto i1 = e1.component<Position>();
 
   CHECK(i0);
   CHECK(i1);
-  CHECK(i1->data == 123456);
+  CHECK(i1->x == 123);
+  CHECK(i1->y == 456);
 }
 
 TEST_CASE("Move Component in the same Container") {
@@ -207,12 +222,13 @@ TEST_CASE("Move Component in the same Container") {
   auto e0 = container.create();
   auto e1 = container.create();
 
-  e0.component<Instrument>().create(123456);
-  e1.component<Instrument>().create(std::move(*e0.component<Instrument>()));
+  e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(std::move(*e0.component<Position>()));
 
-  auto i1 = e1.component<Instrument>();
+  auto i1 = e1.component<Position>();
   CHECK(i1);
-  CHECK(i1->data == 123456);
+  CHECK(i1->x == 123);
+  CHECK(i1->y == 456);
 }
 
 TEST_CASE("Move Component between different Containers") {
@@ -222,19 +238,22 @@ TEST_CASE("Move Component between different Containers") {
   auto e0 = container0.create();
   auto e1 = container1.create();
 
-  e0.component<Instrument>().create(123456);
-  e1.component<Instrument>().create(std::move(*e0.component<Instrument>()));
+  e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(std::move(*e0.component<Position>()));
 
-  auto i1 = e1.component<Instrument>();
+  auto i1 = e1.component<Position>();
   CHECK(i1);
-  CHECK(i1->data == 123456);
+  CHECK(i1->x == 123);
+  CHECK(i1->y == 456);
 }
 
 TEST_CASE("Destroy Component") {
   Container container;
-  auto e = container.create<Position, Velocity>();
+  auto e = container.create();
+  e.create_component<Position>();
+  e.create_component<Velocity>();
 
-  e.component<Velocity>().destroy();
+  e.destroy_component<Velocity>();
 
   CHECK(!e.component<Velocity>());
   CHECK( e.component<Position>());
@@ -246,12 +265,11 @@ TEST_CASE("Non-POD Components") {
   auto e0 = container.create();
   auto e1 = container.create();
 
-  e0.component<Name>().create("foo");
-  e1.component<Name>().create("bar");
+  e0.create_component<Name>("foo");
+  e1.create_component<Name>("bar");
 
-  for (auto e : container.all<Name>()) {
-    auto name = e.component<Name>()->name;
-  }
+  container.each<Name>([](auto, auto&) {
+  });
 }
 
 TEST_CASE("Lifetime events") {
@@ -267,28 +285,20 @@ TEST_CASE("Lifetime events") {
   CHECK(subscriber.creates  == 0);
   CHECK(subscriber.destroys == 0);
 
-  e0.component<Position>().create();
+  e0.create_component<Position>();
   CHECK(subscriber.creates  == 1);
   CHECK(subscriber.destroys == 0);
 
-  auto e1 = container.create<Position>();
+  auto e1 = e0.copy();
   CHECK(subscriber.creates  == 2);
   CHECK(subscriber.destroys == 0);
 
-  container.all<Position>().create();
-  CHECK(subscriber.creates  == 3);
-  CHECK(subscriber.destroys == 0);
-
-  e1.copy();
-  CHECK(subscriber.creates  == 4);
-  CHECK(subscriber.destroys == 0);
-
-  e1.component<Position>().destroy();
-  CHECK(subscriber.creates  == 4);
+  e1.destroy_component<Position>();
+  CHECK(subscriber.creates  == 2);
   CHECK(subscriber.destroys == 1);
 
   e0.destroy();
-  CHECK(subscriber.creates  == 4);
+  CHECK(subscriber.creates  == 2);
   CHECK(subscriber.destroys == 2);
 }
 
@@ -301,7 +311,8 @@ TEST_CASE("Lifetime events on move") {
   PositionSubscriber subscriber1;
   container1.subscribe<Position>(subscriber1);
 
-  auto e0 = container0.create<Position>();
+  auto e0 = container0.create();
+  e0.create_component<Position>();
   CHECK(subscriber0.creates  == 1);
   CHECK(subscriber0.destroys == 0);
   CHECK(subscriber1.creates  == 0);

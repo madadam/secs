@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "secs/heterogeneous_set.h"
+#include "secs/omniset.h"
 
 namespace secs {
 
@@ -166,14 +166,12 @@ public:
 
   template<typename E>
   void emit(E event) const {
-    if (auto p = _publishers.find<Publisher<E>>()) {
-      p->emit(event);
-    }
+    _publishers.get<Publisher<E>>().emit(event);
   }
 
 private:
 
-  HeterogeneousSet _publishers;
+  Omniset _publishers;
 };
 
 } // namespace secs

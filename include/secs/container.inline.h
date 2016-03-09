@@ -1,70 +1,70 @@
 #pragma once
 
 #include "secs/component_ptr.h"
+#include "secs/container.h"
 #include "secs/entity.h"
-#include "secs/entity_view.h"
+#include "secs/lifetime_subscriber.h"
+#include "secs/misc.h"
 
 namespace secs {
 
 // Container implementation
+template<typename... Ts, typename F>
+void Container::each(F&& f) {
+  static_assert(is_callable<F, Entity, Ts&...>, "f is not callable with (Entity, Ts&...)");
 
-template<typename... Ts>
-EntityView<Ts...> Container::all() {
-  return { *this };
+  auto ss = _stores.slice<ComponentStore<Ts>...>();
+
+  for (size_t i = 0; i < _capacity; ++i) {
+    if (all(ss, [i](auto& store) { return store.contains(i); })) {
+      f(get(i), std::get<ComponentStore<Ts>&>(ss).get(i)...);
+    }
+  }
 }
 
 inline Entity Container::get(size_t index) {
   return Entity(*this, index, get_version(index));
 }
 
-template<typename T, typename... Ts>
-Entity Container::create() {
-  auto entity = create();
-  create_components<T, Ts...>(entity._index);
-  return entity;
-}
-
-template<typename T, typename... Ts>
-Entity Container::create(T&& c, Ts&&... cs) {
-  auto entity = create();
-  create_components(entity._index, std::forward<T>(c), std::forward<Ts>(cs)...);
-  return entity;
-}
-
 template<typename T, typename... Args>
-void Container::create_component(size_t index, Args&&... args) {
-  auto& store = get_store<T>();
-  assert(!store.contains(index));
+ComponentPtr<T> Container::create_component( const Entity& entity
+                                           , Args&&...     args)
+{
+  auto& s = store<T>();
+  assert(!s.contains(entity._index));
 
   _ops.get<T>().template setup<T>();
-  store.emplace(index, std::forward<Args>(args)...);
-  _event_manager.emit(OnCreate<T>{ get(index).component<T>() });
-}
 
-template<typename T0, typename T1, typename... Ts>
-void Container::create_components(size_t index) {
-  create_component<T0>(index);
-  create_components<T1, Ts...>(index);
-}
+  s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
+  ComponentPtr<T> component(s, entity._index, entity._version);
 
-template<typename T>
-void Container::create_components(size_t index) {
-  create_component<T>(index);
-}
+  OnCreate<T> event{ entity, component };
+  _event_manager.emit(event);
 
-template<typename T, typename... Ts>
-void Container::create_components(size_t index, T&& c, Ts&&... cs) {
-  create_component<typename std::decay<T>::type>(index, std::forward<T>(c));
-  create_components(index, std::forward<Ts>(cs)...);
+  return component;
 }
 
 template<typename T>
-void Container::destroy_component(size_t index) {
-  auto& store = get_store<T>();
-  assert(store.contains(index));
+void Container::destroy_component(const Entity& entity) {
+  auto& s = store<T>();
+  assert(s.contains(entity._index, entity._version));
 
-  _event_manager.emit(OnDestroy<T>{ get(index).component<T>() });
-  store.erase(index);
+  OnDestroy<T> event{ entity, { s, entity._index, entity._version } };
+  _event_manager.emit(event);
+
+  s.erase(entity._index);
+}
+
+template<typename T>
+void Container::subscribe(LifetimeSubscriber<T>& subscriber) {
+  _event_manager.subscribe<OnCreate<T>>(subscriber);
+  _event_manager.subscribe<OnDestroy<T>>(subscriber);
+}
+
+template<typename T>
+void Container::unsubscribe(LifetimeSubscriber<T>& subscriber) {
+  _event_manager.unsubscribe<OnCreate<T>>(subscriber);
+  _event_manager.unsubscribe<OnDestroy<T>>(subscriber);
 }
 
 
@@ -72,7 +72,7 @@ void Container::destroy_component(size_t index) {
 template<typename T>
 typename std::enable_if<std::is_copy_constructible<T>::value, void>::type
 ComponentOps::copy(const Entity& source, const Entity& target) {
-  target.component<T>().create(*source.component<T>());
+  target.create_component<T>(*source.component<T>());
 }
 
 template<typename T>
@@ -83,29 +83,35 @@ ComponentOps::copy(const Entity&, const Entity&) {
 
 template<typename T>
 void ComponentOps::move(const Entity& source, const Entity& target) {
-  target.component<T>().create(std::move(*source.component<T>()));
-  source.component<T>().destroy();
+  target.create_component<T>(std::move(*source.component<T>()));
+  source.destroy_component<T>();
 }
 
 template<typename T>
 void ComponentOps::destroy(const Entity& entity) {
-  entity.component<T>().destroy();
-}
-
-
-// ComponentPtr implementation
-template<typename T>
-Entity ComponentPtr<T>::entity() const {
-  assert(valid());
-  return _container->get(_index);
+  entity.destroy_component<T>();
 }
 
 
 // Entity implementation
 template<typename T>
 ComponentPtr<T> Entity::component() const {
-  assert(valid());
-  return { *_container, _index, _version };
+  assert(*this);
+  return { _container->store<T>(), _index, _version };
+}
+
+template<typename T, typename... Args>
+ComponentPtr<T> Entity::create_component(Args&&... args) const {
+  static_assert(std::is_constructible<T, Args...>::value, "T is not constructible from Args");
+
+  assert(*this);
+  return _container->create_component<T>(*this, std::forward<Args>(args)...);
+}
+
+template<typename T>
+void Entity::destroy_component() const {
+  assert(*this);
+  _container->destroy_component<T>(*this);
 }
 
 } // namespace secs

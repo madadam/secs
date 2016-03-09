@@ -11,30 +11,11 @@
 
 namespace secs {
 
-class Any;
-
-namespace detail {
-template<typename T>
-constexpr bool is_any = std::is_same<typename std::decay<T>::type, Any>::value;
-}
-
 class Any {
 private:
-
-  template<typename T>
-  static
-  typename std::enable_if<std::is_copy_constructible<T>::value, void*>::type
-  copy(void* store) {
-    return new T(*reinterpret_cast<T*>(store));
-  }
-
-  template<typename T>
-  static
-  typename std::enable_if<!std::is_copy_constructible<T>::value, void*>::type
-  copy(void*) {
-    assert(false);
-    return nullptr;
-  }
+  template<typename T, typename R = void>
+  using disable_if_self = typename std::enable_if<
+    !std::is_same<typename std::decay<T>::type, Any>::value, R>::type;
 
   template<typename T>
   static void destroy(void* store) {
@@ -45,52 +26,48 @@ public:
   Any() {}
 
   template<typename T>
-  Any( T&& value
-     , typename std::enable_if<!detail::is_any<T>, void*>::type = nullptr)
+  Any( T&& value, disable_if_self<T, void*> = nullptr)
     : _store(new T(std::forward<T>(value)))
     , _destroy(&destroy<T>)
-    , _copy(&copy<T>)
   {}
 
   ~Any() {
     reset();
   }
 
-  Any(const Any&);
+  Any(const Any&) = delete;
   Any(Any&&) noexcept;
 
-  Any& operator = (const Any&);
+  Any& operator = (const Any&) = delete;
   Any& operator = (Any&&);
 
   template<typename T>
-  typename std::enable_if<!detail::is_any<T>, Any&>::type
-  operator = (T&& value) {
-    reset();
-
-    _store = new T(std::forward<T>(value));
-    _destroy = &destroy<T>;
-    _copy = &copy<T>;
-
+  disable_if_self<T, Any&> operator = (T&& value) {
+    emplace<T>(std::forward<T>(value));
     return *this;
+  }
+
+  template<typename T, typename... Args>
+  void emplace(Args&&... args) {
+    reset();
+    _store = new T(std::forward<Args>(args)...);
+    _destroy = &destroy<T>;
   }
 
   template<typename T>
   const T& get() const {
-    assert(!empty());
+    assert(*this);
     return *reinterpret_cast<const T*>(_store);
   }
 
   template<typename T>
   T& get() {
-    if (empty()) {
-      *this = T();
-    }
-
+    assert(*this);
     return *reinterpret_cast<T*>(_store);
   }
 
-  bool empty() const {
-    return _store == nullptr;
+  explicit operator bool () const {
+    return _store != nullptr;
   }
 
   // Test that this Any contains a value of type T.
@@ -102,17 +79,10 @@ public:
   void reset();
 
 private:
-
-  static void* copy(const Any&);
-
-private:
-
-  using Destroy = void  (*)(void*);
-  using Copy    = void* (*)(void*);
+  using Destroy = void (*)(void*);
 
   void*   _store   = nullptr;
   Destroy _destroy = nullptr;
-  Copy    _copy    = nullptr;
 };
 
 }; // namespace secs

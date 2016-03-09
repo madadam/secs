@@ -1,34 +1,33 @@
 #pragma once
 
+#include <cmath>
 #include <cstring>
 #include <memory>
-#include <boost/dynamic_bitset.hpp>
+#include <vector>
+#include "secs/store.h"
 
 namespace secs {
 
 namespace detail {
   template<typename T>
-  using Slot = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
-
-  template<typename T>
-  T* ptr(Slot<T>* data, size_t index) {
+  T* ptr(Store<T>* data, size_t index) {
     return reinterpret_cast<T*>(data + index);
   }
 
   template<typename T>
-  const T* ptr(const Slot<T>* data, size_t index) {
+  const T* ptr(const Store<T>* data, size_t index) {
     return reinterpret_cast<T*>(data + index);
   }
 
   template<typename T>
   typename std::enable_if<!std::is_trivially_copyable<T>::value, void>::type
-  move( Slot<T>*                       dst
-      , Slot<T>*                       src
-      , size_t                         count
-      , const boost::dynamic_bitset<>& flags)
+  move( Store<T>*                    dst
+      , Store<T>*                    src
+      , size_t                       count
+      , const std::vector<uint64_t>& versions)
   {
     for (size_t i = 0; i < count; ++i) {
-      if (flags[i]) {
+      if (versions[i] > 0) {
         new (ptr<T>(dst, i)) T(std::move(*ptr<T>(src, i)));
       }
     }
@@ -38,19 +37,13 @@ namespace detail {
   // memcpy.
   template<typename T>
   typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type
-  move( Slot<T>*                       dst
-      , Slot<T>*                       src
-      , size_t                         count
-      , const boost::dynamic_bitset<>&)
-  {
+  move(Store<T>* dst, Store<T>* src, size_t count, const std::vector<uint64_t>&) {
     std::memcpy( reinterpret_cast<void*>(dst)
                , reinterpret_cast<void*>(src)
-               , count * sizeof(Slot<T>));
+               , count * store_size<T>);
   }
 
 } // namespace detail
-
-// TODO: If T is copyable, ComponentStore<T> should also be copyable.
 
 template<typename T>
 class ComponentStore {
@@ -61,7 +54,7 @@ public:
 
   ~ComponentStore() {
     for (size_t i = 0; i < size(); ++i) {
-      if (_flags[i]) ptr(i)->~T();
+      if (_versions[i] > 0) ptr(i)->~T();
     }
   }
 
@@ -69,38 +62,44 @@ public:
   ComponentStore& operator = (ComponentStore&&) = default;
 
   size_t size() const {
-    return _flags.size();
+    return _versions.size();
+  }
+
+  bool contains(size_t index, uint64_t version) const {
+    return index < _versions.size() && _versions[index] == version;
   }
 
   bool contains(size_t index) const {
-    return index < _flags.size() && _flags[index];
+    return index < _versions.size() && _versions[index] > 0;
   }
 
-  T* get(size_t index) {
-    return contains(index) ? ptr(index) : nullptr;
+  T& get(size_t index) {
+    assert(index < size());
+    return *ptr(index);
   }
 
-  const T* get(size_t index) const {
-    return contains(index) ? ptr(index) : nullptr;
+  const T& get(size_t index) const {
+    assert(index < size());
+    return *ptr(index);
   }
 
   template<typename... Args>
-  void emplace(size_t index, Args&&... args);
+  void emplace(size_t index, uint64_t version, Args&&... args);
 
-  void emplace(size_t index, const T& other);
-  void emplace(size_t index, T& other);
-  void emplace(size_t index, T&& other);
+  void emplace(size_t index, uint64_t version, const T& other);
+  void emplace(size_t index, uint64_t version, T& other);
+  void emplace(size_t index, uint64_t version, T&& other);
 
   void erase(size_t index) {
-    if (!contains(index)) return;
+    if (_versions[index] == 0) return;
 
     ptr(index)->~T();
-    _flags[index] = false;
+    _versions[index] = 0;
   }
 
 
 private:
-  using Slot = detail::Slot<T>;
+  using Slot = Store<T>;
 
   static constexpr double GROW_RATE = 1.5;
 
@@ -118,25 +117,28 @@ private:
     auto old_size = size();
     auto new_size = std::max((size_t) std::ceil(GROW_RATE * old_size), index + 1);
 
-    _flags.resize(new_size);
+    _versions.resize(new_size);
 
     auto new_data = std::make_unique<Slot[]>(new_size);
-    detail::move<T>(new_data.get(), _data.get(), old_size, _flags);
+    detail::move<T>(new_data.get(), _data.get(), old_size, _versions);
 
     _data = std::move(new_data);
   }
 
   template<typename... Args>
-  void emplace_without_invalidation_check(size_t index, Args&&... args) {
+  void emplace_without_invalidation_check( size_t    index
+                                         , uint64_t  version
+                                         , Args&&... args)
+  {
     reserve_for(index);
 
-    if (_flags[index]) {
+    if (_versions[index] > 0) {
       ptr(index)->~T();
     }
 
     new (ptr(index)) T(std::forward<Args>(args)...);
 
-    _flags[index] = true;
+    _versions[index] = version;
   }
 
   // Is inserting item into the given index going to invalidate the source
@@ -147,45 +149,50 @@ private:
 
 private:
 
-  boost::dynamic_bitset<> _flags;
+  std::vector<uint64_t>   _versions;
   std::unique_ptr<Slot[]> _data;
 };
 
 template<typename T> template<typename... Args>
-void ComponentStore<T>::emplace(size_t index, Args&&... args) {
-  emplace_without_invalidation_check(index, std::forward<Args>(args)...);
+void ComponentStore<T>::emplace( size_t    index
+                               , uint64_t  version
+                               , Args&&... args)
+{
+  emplace_without_invalidation_check( index
+                                    , version
+                                    , std::forward<Args>(args)...);
 }
 
 // These overloads are necessary to prevent invalidating the source reference
 // when the target storage has to be reallocated.
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, T& other) {
+void ComponentStore<T>::emplace(size_t index, uint64_t version, T& other) {
   if (will_invalidate(index, &other)) {
     T temp(other);
-    emplace_without_invalidation_check(index, std::move(temp));
+    emplace_without_invalidation_check(index, version, std::move(temp));
   } else {
-    emplace_without_invalidation_check(index, other);
+    emplace_without_invalidation_check(index, version, other);
   }
 }
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, const T& other) {
+void ComponentStore<T>::emplace(size_t index, uint64_t version, const T& other) {
   if (will_invalidate(index, &other)) {
     T temp(other);
-    emplace_without_invalidation_check(index, std::move(temp));
+    emplace_without_invalidation_check(index, version, std::move(temp));
   } else {
-    emplace_without_invalidation_check(index, other);
+    emplace_without_invalidation_check(index, version, other);
   }
 }
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, T&& other) {
+void ComponentStore<T>::emplace(size_t index, uint64_t version, T&& other) {
   if (will_invalidate(index, &other)) {
     T temp(std::move(other));
-    emplace_without_invalidation_check(index, std::move(temp));
+    emplace_without_invalidation_check(index, version, std::move(temp));
   } else {
-    emplace_without_invalidation_check(index, std::move(other));
+    emplace_without_invalidation_check(index, version, std::move(other));
   }
 }
 
