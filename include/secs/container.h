@@ -12,8 +12,9 @@
 namespace secs {
 template<typename> class ComponentPtr;
 class Entity;
-template<typename...> class EntityView;
+template<typename, typename> class EntityView;
 template<typename> class LifetimeSubscriber;
+namespace detail { template<typename, typename> class EntityView; }
 
 class Container {
 public:
@@ -23,8 +24,14 @@ public:
   // Destroy Entity.
   void destroy(const Entity& entity);
 
-  template<typename... Ts>
-  EntityView<Ts...> entities();
+  // Get collection of all Entities in this Container. This collection can be
+  // further refined using with<T...>() and without<T...>() functions.
+  //
+  // Example:
+  //
+  //   container.entities().with<Position, Velocity>().without<Shields>()
+  //
+  EntityView<std::tuple<>, std::tuple<>> entities();
 
   size_t size() const {
     return _capacity - _holes.size();
@@ -36,13 +43,31 @@ public:
   template<typename T> void unsubscribe(LifetimeSubscriber<T>& subscriber);
 
 private:
+  struct Meta {
+    bool     exists  = false;
+    uint64_t version = 0;
+
+    uint64_t create() {
+      exists = true;
+      return ++version;
+    }
+
+    uint64_t destroy() {
+      exists = false;
+      return ++version;
+    }
+  };
 
   size_t capacity() const {
     return _capacity;
   }
 
   uint64_t get_version(size_t index) const {
-    return index < _versions.size() ? _versions[index] : 0;
+    return index < _meta.size() ? _meta[index].version : 0;
+  }
+
+  bool contains(size_t index) const {
+    return index < _meta.size() && _meta[index].exists;
   }
 
   template<typename T>
@@ -66,17 +91,15 @@ private:
 
 private:
 
-  template<typename...> struct HasAllComponents;
-
   size_t                      _capacity = 0;
   std::vector<size_t>         _holes;
-  std::vector<uint64_t>       _versions;
+  std::vector<Meta>           _meta;
 
   Omniset                     _stores;
   TypeKeyedMap<ComponentOps>  _ops;
   EventManager                _event_manager;
 
-  template<typename...> friend class EntityView;
+  template<typename, typename> friend class detail::EntityView;
   template<typename> friend class ComponentPtr;
   friend class Entity;
 };

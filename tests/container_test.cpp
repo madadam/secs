@@ -127,7 +127,7 @@ TEST_CASE("Iterate over entities") {
   Container container;
   size_t counter = 0;
 
-  for (auto c : container.entities<>()) {
+  for (auto c : container.entities()) {
     unused(c);
     ++counter;
   }
@@ -137,34 +137,34 @@ TEST_CASE("Iterate over entities") {
   e0.create_component<Position>(123, 456);
 
   counter = 0;
-  for (auto c : container.entities<>()) {
+  for (auto c : container.entities()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.entities<Position>()) {
+  for (auto c : container.entities().with<Position>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.entities<Position>()) {
+  for (auto c : container.entities().with<Position>()) {
     if (c.entity() == e0) ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.entities<Position>()) {
+  for (auto c : container.entities().with<Position>()) {
     if (c.get<Position>().x == 123 && c.get<Position>().y == 456) {
       ++counter;
     }
   }
   CHECK(counter == 1);
 
-  for (auto c : container.entities<Position>()) {
+  for (auto c : container.entities().with<Position>()) {
     c.get<Position>().x = 789;
   }
   CHECK(e0.component<Position>()->x == 789);
@@ -174,19 +174,25 @@ TEST_CASE("Iterate over entities") {
   e1.create_component<Velocity>();
 
   counter = 0;
-  for (auto c : container.entities<Position>()) {
+  for (auto c : container.entities().with<Position>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 2);
 
   counter = 0;
-  for (auto c : container.entities<Position, Velocity>()) {
+  for (auto c : container.entities().with<Position, Velocity>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 1);
 
+  counter = 0;
+  for (auto c : container.entities().with<Position>().without<Velocity>()) {
+    unused(c);
+    ++counter;
+  }
+  CHECK(counter == 1);
 }
 
 TEST_CASE("Create Components") {
@@ -288,7 +294,7 @@ TEST_CASE("Non-POD Components") {
   e0.create_component<Name>("foo");
   e1.create_component<Name>("bar");
 
-  for (auto c : container.entities<Name>()) {
+  for (auto c : container.entities().with<Name>()) {
     auto name = c.get<Name>().name;
   }
 }

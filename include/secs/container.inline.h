@@ -10,8 +10,7 @@
 namespace secs {
 
 // Container implementation
-template<typename... Ts>
-EntityView<Ts...> Container::entities() {
+inline EntityView<std::tuple<>, std::tuple<>> Container::entities() {
   return { *this };
 }
 
