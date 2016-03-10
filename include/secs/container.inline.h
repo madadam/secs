@@ -5,12 +5,12 @@
 #include "secs/entity.h"
 #include "secs/entity_view.h"
 #include "secs/lifetime_subscriber.h"
-#include "secs/misc.h"
 
 namespace secs {
 
 // Container implementation
-inline EntityView<std::tuple<>, std::tuple<>> Container::entities() {
+inline EntityView<std::tuple<>, std::tuple<>, std::tuple<>>
+Container::entities() {
   return { *this };
 }
 

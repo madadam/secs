@@ -12,9 +12,8 @@
 namespace secs {
 template<typename> class ComponentPtr;
 class Entity;
-template<typename, typename> class EntityView;
+template<typename, typename, typename> class EntityView;
 template<typename> class LifetimeSubscriber;
-namespace detail { template<typename, typename> class EntityView; }
 
 class Container {
 public:
@@ -25,13 +24,10 @@ public:
   void destroy(const Entity& entity);
 
   // Get collection of all Entities in this Container. This collection can be
-  // further refined using with<T...>() and without<T...>() functions.
-  //
-  // Example:
-  //
-  //   container.entities().with<Position, Velocity>().without<Shields>()
-  //
-  EntityView<std::tuple<>, std::tuple<>> entities();
+  // further refined using need(), skip() and load().
+  EntityView< std::tuple<>
+            , std::tuple<>
+            , std::tuple<>> entities();
 
   size_t size() const {
     return _capacity - _holes.size();
@@ -99,9 +95,9 @@ private:
   TypeKeyedMap<ComponentOps>  _ops;
   EventManager                _event_manager;
 
-  template<typename, typename> friend class detail::EntityView;
   template<typename> friend class ComponentPtr;
   friend class Entity;
+  template<typename, typename, typename> friend class EntityView;
 };
 
 } // namespace secs

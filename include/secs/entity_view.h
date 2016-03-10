@@ -1,7 +1,6 @@
 #pragma once
 
 #include "secs/container.h"
-#include "secs/misc.h"
 
 namespace secs {
 
@@ -21,24 +20,88 @@ struct ComponentStoreRefs<std::tuple<Ts...>> {
 template<typename T>
 using ComponentStoreRefs = typename help::ComponentStoreRefs<T>::type;
 
+
 // Convert tuple<T...> to tuple<T&...>
 namespace help {
 template<typename... Ts>
-struct ComponentRefs;
+struct ToRefs;
 
 template<typename... Ts>
-struct ComponentRefs<std::tuple<Ts...>> {
-  using type = std::tuple<Ts&...>;
+struct ToRefs<std::tuple<Ts...>> {
+  using type = std::tuple<typename std::add_lvalue_reference<Ts>::type...>;
 };
 }
 
 template<typename T>
-using ComponentRefs = typename help::ComponentRefs<T>::type;
+using ToRefs = typename help::ToRefs<T>::type;
+
+
+// Convert tuple<T...> to tuple<T*...>
+namespace help {
+template<typename... Ts>
+struct ToPtrs;
+
+template<typename... Ts>
+struct ToPtrs<std::tuple<Ts...>> {
+  using type = std::tuple<typename std::add_pointer<Ts>::type...>;
+};
+}
+
+template<typename T>
+using ToPtrs = typename help::ToPtrs<T>::type;
+
+
+// Test if tuple contains the given type.
+namespace help {
+template<typename T, typename E>
+struct Contains;
+
+template<typename T, typename... Ts, typename E>
+struct Contains<std::tuple<T, Ts...>, E> {
+  static const bool value = std::is_same<T, E>::value
+                         || Contains<std::tuple<Ts...>, E>::value;
+};
+
+template<typename E>
+struct Contains<std::tuple<>, E> {
+  static const bool value = false;
+};
+}
+
+template<typename T, typename E>
+constexpr bool Contains = help::Contains<T, E>::value;
+
+
+// Return true if the predicate returns true for all elements of the tuple.
+namespace help {
+template<int I, typename... Ts>
+struct All {
+  template<typename F>
+  bool operator () (const std::tuple<Ts...>& tuple, F&& pred) const {
+    return pred(std::get<I - 1>(tuple))
+        && All<I - 1, Ts...>()(tuple, std::forward<F>(pred));
+  }
+};
+
+template<typename... Ts>
+struct All<0, Ts...> {
+  template<typename F>
+  bool operator () (const std::tuple<Ts...>&, F&&) const {
+    return true;
+  }
+};
+}
+
+template<typename... Ts, typename F>
+bool all(const std::tuple<Ts...>& tuple, F&& pred) {
+  return help::All<sizeof...(Ts), Ts...>()(tuple, std::forward<F>(pred));
+}
+
 
 // Test if all stores have component at the given index.
 template<typename T>
 bool has_all(const ComponentStoreRefs<T>& stores, size_t index) {
-  return secs::all(stores, [=](auto& store) {
+  return all(stores, [=](auto& store) {
     return store.contains(index);
   });
 }
@@ -46,19 +109,19 @@ bool has_all(const ComponentStoreRefs<T>& stores, size_t index) {
 // Test if no store has component at the given index.
 template<typename T>
 bool has_none(const ComponentStoreRefs<T>& stores, size_t index) {
-  return secs::all(stores, [=](auto& store) {
+  return all(stores, [=](auto& store) {
     return !store.contains(index);
   });
 }
 
-// Get tuple of index-th components, one from each store in the given store
-// tuple.
+// Get tuple of references to index-th components, one from each store in the
+// given store tuple.
 namespace help {
 template<typename T>
-struct Get;
+struct GetRefs;
 
 template<typename... Ts>
-struct Get<std::tuple<Ts...>> {
+struct GetRefs<std::tuple<Ts...>> {
   auto operator () ( const detail::ComponentStoreRefs<std::tuple<Ts...>>& stores
                    , size_t index) const
   {
@@ -69,9 +132,42 @@ struct Get<std::tuple<Ts...>> {
 }
 
 template<typename T>
-auto get(const ComponentStoreRefs<T>& stores, size_t index) {
-  return help::Get<T>()(stores, index);
+auto get_refs(const ComponentStoreRefs<T>& stores, size_t index) {
+  return help::GetRefs<T>()(stores, index);
 }
+
+
+// Get pointer to component from the store, or nullptr it there is no component.
+template<typename T>
+T* get_ptr(ComponentStore<T>& store, size_t index) {
+  return store.contains(index) ? &store.get(index) : nullptr;
+}
+
+
+// Get tuple of pointers to index-th components, one from each store in the
+// given store tuple. If a store does not have component at index-th position,
+// nullptr is returned in its place.
+namespace help {
+template<typename T>
+struct GetPtrs;
+
+template<typename... Ts>
+struct GetPtrs<std::tuple<Ts...>> {
+  auto operator () ( const detail::ComponentStoreRefs<std::tuple<Ts...>>& stores
+                   , size_t index) const
+  {
+    (void) index; // supress unused warning
+    return std::make_tuple(get_ptr( std::get<ComponentStore<Ts>&>(stores)
+                                  , index)...);
+  }
+};
+}
+
+template<typename T>
+auto get_ptrs(const ComponentStoreRefs<T>& stores, size_t index) {
+  return help::GetPtrs<T>()(stores, index);
+}
+
 
 // Call set.slice, but use the types from the tuple T
 namespace help {
@@ -91,8 +187,10 @@ auto slice(const Omniset& set) {
   return help::Slice<T>()(set);
 }
 
+} // namespace detail
+
 // Base EntityView
-template<typename Include, typename Exclude>
+template<typename Need, typename Skip, typename Load>
 class EntityView {
 public:
   class Iterator;
@@ -104,19 +202,33 @@ public:
     }
 
     template<typename T>
-    T& get() const {
-      return std::get<T&>(_components);
+    typename std::enable_if<!std::is_pointer<T>::value, T&>::type
+    get() const {
+      static_assert(detail::Contains<Need, T>, "T is not among needed Component types");
+      return std::get<T&>(_need);
+    }
+
+    template<typename T>
+    typename std::enable_if<std::is_pointer<T>::value, T>::type
+    get() const {
+      static_assert( detail::Contains<Load, typename std::remove_pointer<T>::type>
+                   , "T is not among loaded Component types");
+      return std::get<T>(_load);
     }
 
   private:
-    Cursor(Entity entity, const ComponentRefs<Include>& components)
+    Cursor( Entity                      entity
+          , const detail::ToRefs<Need>& need
+          , const detail::ToPtrs<Load>& load)
       : _entity(entity)
-      , _components(components)
+      , _need(need)
+      , _load(load)
     {}
 
   private:
-    const Entity                         _entity;
-    const detail::ComponentRefs<Include> _components;
+    const Entity               _entity;
+    const detail::ToRefs<Need> _need;
+    const detail::ToPtrs<Load> _load;
 
     friend class Iterator;
   };
@@ -134,17 +246,20 @@ public:
 
     Cursor operator * () const {
       return { _container.get(_index)
-             , detail::get<Include>(_include, _index) };
+             , detail::get_refs<Need>(_need, _index)
+             , detail::get_ptrs<Load>(_load, _index) };
     }
 
   private:
-    Iterator( Container&                         container
-            , const ComponentStoreRefs<Include>& include
-            , const ComponentStoreRefs<Exclude>& exclude
-            , size_t                             index)
+    Iterator( Container&                              container
+            , const detail::ComponentStoreRefs<Need>& need
+            , const detail::ComponentStoreRefs<Skip>& skip
+            , const detail::ComponentStoreRefs<Load>& load
+            , size_t                                  index)
       : _container(container)
-      , _include(include)
-      , _exclude(exclude)
+      , _need(need)
+      , _skip(skip)
+      , _load(load)
       , _index(index)
     {
       advance(0);
@@ -155,8 +270,8 @@ public:
 
       for (; _index < _container.capacity(); ++_index) {
         if (  _container.contains(_index)
-           && has_all <Include>(_include, _index)
-           && has_none<Exclude>(_exclude, _index))
+           && detail::has_all <Need>(_need, _index)
+           && detail::has_none<Skip>(_skip, _index))
         {
           return;
         }
@@ -166,10 +281,11 @@ public:
     }
 
   private:
-    Container&                  _container;
-    ComponentStoreRefs<Include> _include;
-    ComponentStoreRefs<Exclude> _exclude;
-    size_t                      _index;
+    Container&                       _container;
+    detail::ComponentStoreRefs<Need> _need;
+    detail::ComponentStoreRefs<Skip> _skip;
+    detail::ComponentStoreRefs<Load> _load;
+    size_t                           _index;
 
     friend class EntityView;
   };
@@ -178,69 +294,43 @@ public:
 
   EntityView(Container& container)
     : _container(container)
-    , _include(slice<Include>(container._stores))
-    , _exclude(slice<Exclude>(container._stores))
+    , _need(detail::slice<Need>(container._stores))
+    , _skip(detail::slice<Skip>(container._stores))
+    , _load(detail::slice<Load>(container._stores))
   {}
 
   Iterator begin() {
-    return { _container, _include, _exclude, 0 };
+    return { _container, _need, _skip, _load, 0 };
   }
 
   Iterator end() {
-    return { _container, _include, _exclude, _container.capacity() };
+    return { _container, _need, _skip, _load, _container.capacity() };
+  }
+
+  // Refine this view to include only entities that contain the given Components.
+  template<typename... Ts>
+  EntityView<std::tuple<Ts...>, Skip, Load> need() const {
+    return { _container };
+  }
+
+  // Refine this view to include only entities that do not contain any of the
+  // given Component.
+  template<typename... Ts>
+  EntityView<Need, std::tuple<Ts...>, Load> skip() const {
+    return { _container };
+  }
+
+  // Preload the given components for faster access.
+  template<typename... Ts>
+  EntityView<Need, Skip, std::tuple<Ts...>> load() const {
+    return { _container };
   }
 
 protected:
-  Container&                  _container;
-  ComponentStoreRefs<Include> _include;
-  ComponentStoreRefs<Exclude> _exclude;
-};
-
-} // namespace detail
-
-// Entities that have all the Include'd components and none of the Exclude'd
-// components.
-template<typename Include, typename Exclude>
-class EntityView : public detail::EntityView<Include, Exclude> {
-  using Base = detail::EntityView<Include, Exclude>;
-  using Base::EntityView;
-};
-
-// All entities
-template<>
-class EntityView<std::tuple<>, std::tuple<>>
-  : public detail::EntityView<std::tuple<>, std::tuple<>>
-{
-  using Base = detail::EntityView<std::tuple<>, std::tuple<>>;
-  using Base::EntityView;
-  using Base::_container;
-public:
-
-  template<typename... Ts>
-  EntityView<std::tuple<Ts...>, std::tuple<>> with() const {
-    return { _container };
-  }
-
-  template<typename... Ts>
-  EntityView<std::tuple<>, std::tuple<Ts...>> without() const {
-    return { _container };
-  }
-};
-
-// Only entities with the given components
-template<typename Include>
-class EntityView<Include, std::tuple<>>
-  : public detail::EntityView<Include, std::tuple<>>
-{
-  using Base = detail::EntityView<Include, std::tuple<>>;
-  using Base::EntityView;
-  using Base::_container;
-public:
-
-  template<typename... Ts>
-  EntityView<Include, std::tuple<Ts...>> without() const {
-    return { _container };
-  }
+  Container&                       _container;
+  detail::ComponentStoreRefs<Need> _need;
+  detail::ComponentStoreRefs<Skip> _skip;
+  detail::ComponentStoreRefs<Load> _load;
 };
 
 } // namespace secs
