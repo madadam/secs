@@ -24,7 +24,7 @@ void Container::destroy(const Entity& entity) {
     ops.destroy(entity);
   }
 
-  after_destroy(entity._index);
+  cleanup(entity._index);
 }
 
 void Container::copy(const Entity& source, const Entity& target) {
@@ -42,10 +42,10 @@ void Container::move(const Entity& source, const Entity& target) {
     ops.move(source, target);
   }
 
-  after_destroy(source._index);
+  cleanup(source._index);
 }
 
-void Container::after_destroy(size_t index) {
+void Container::cleanup(size_t index) {
   _holes.push_back(index);
   ++_versions[index];
 }

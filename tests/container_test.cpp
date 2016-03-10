@@ -25,6 +25,14 @@ public:
   std::string name;
 };
 
+struct EntityAwareComponent {
+  Entity self = nullptr;
+};
+
+void on_create(Entity e, ComponentPtr<EntityAwareComponent> c) {
+  c->self = e;
+}
+
 class PositionSubscriber : public LifetimeSubscriber<Position> {
 public:
   int creates = 0;
@@ -119,7 +127,7 @@ TEST_CASE("Iterate over entities") {
   Container container;
   size_t counter = 0;
 
-  for (auto c : container.all<>()) {
+  for (auto c : container.entities<>()) {
     unused(c);
     ++counter;
   }
@@ -129,34 +137,34 @@ TEST_CASE("Iterate over entities") {
   e0.create_component<Position>(123, 456);
 
   counter = 0;
-  for (auto c : container.all<>()) {
+  for (auto c : container.entities<>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.all<Position>()) {
+  for (auto c : container.entities<Position>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.all<Position>()) {
-    if (c.entity == e0) ++counter;
+  for (auto c : container.entities<Position>()) {
+    if (c.entity() == e0) ++counter;
   }
   CHECK(counter == 1);
 
   counter = 0;
-  for (auto c : container.all<Position>()) {
+  for (auto c : container.entities<Position>()) {
     if (c.get<Position>().x == 123 && c.get<Position>().y == 456) {
       ++counter;
     }
   }
   CHECK(counter == 1);
 
-  for (auto c : container.all<Position>()) {
+  for (auto c : container.entities<Position>()) {
     c.get<Position>().x = 789;
   }
   CHECK(e0.component<Position>()->x == 789);
@@ -166,14 +174,14 @@ TEST_CASE("Iterate over entities") {
   e1.create_component<Velocity>();
 
   counter = 0;
-  for (auto c : container.all<Position>()) {
+  for (auto c : container.entities<Position>()) {
     unused(c);
     ++counter;
   }
   CHECK(counter == 2);
 
   counter = 0;
-  for (auto c : container.all<Position, Velocity>()) {
+  for (auto c : container.entities<Position, Velocity>()) {
     unused(c);
     ++counter;
   }
@@ -280,7 +288,7 @@ TEST_CASE("Non-POD Components") {
   e0.create_component<Name>("foo");
   e1.create_component<Name>("bar");
 
-  for (auto c : container.all<Name>()) {
+  for (auto c : container.entities<Name>()) {
     auto name = c.get<Name>().name;
   }
 }
@@ -336,4 +344,12 @@ TEST_CASE("Lifetime events on move") {
   CHECK(subscriber0.destroys == 1);
   CHECK(subscriber1.creates  == 1);
   CHECK(subscriber1.destroys == 0);
+}
+
+TEST_CASE("Lifetime callbacks") {
+  Container container;
+  auto e = container.create();
+  auto c = e.create_component<EntityAwareComponent>();
+
+  CHECK(c->self == e);
 }

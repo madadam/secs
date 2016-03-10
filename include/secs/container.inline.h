@@ -11,7 +11,7 @@ namespace secs {
 
 // Container implementation
 template<typename... Ts>
-EntityView<Ts...> Container::all() {
+EntityView<Ts...> Container::entities() {
   return { *this };
 }
 
@@ -31,8 +31,7 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
   ComponentPtr<T> component(s, entity._index, entity._version);
 
-  OnCreate<T> event{ entity, component };
-  _event_manager.emit(event);
+  emit_on_create(entity, component);
 
   return component;
 }
@@ -107,5 +106,24 @@ void Entity::destroy_component() const {
   _container->destroy_component<T>(*this);
 }
 
+template<typename T>
+void on_create(const Entity&, const ComponentPtr<T>&) {}
+
 } // namespace secs
 
+// This needs to be defined outside of any namespace, as it exploits Argument
+// Dependent Lookup.
+template<typename T>
+void
+secs::Container::emit_on_create( const secs::Entity&          entity
+                               , const secs::ComponentPtr<T>& component) const
+{
+  using secs::on_create;
+
+  // Static on_create callback (at most one per type).
+  on_create(entity, component);
+
+  // Dynamic on_create subscribers.
+  secs::OnCreate<T> event{ entity, component };
+  _event_manager.emit(event);
+}

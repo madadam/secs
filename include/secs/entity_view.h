@@ -11,7 +11,9 @@ public:
 
   class Cursor {
   public:
-    const Entity entity;
+    const Entity& entity() const {
+      return _entity;
+    }
 
     template<typename T>
     T& get() const {
@@ -20,11 +22,12 @@ public:
 
   private:
     Cursor(Entity entity, Ts&... components)
-      : entity(entity)
+      : _entity(entity)
       , _components(components...)
     {}
 
   private:
+    const Entity             _entity;
     const std::tuple<Ts&...> _components;
 
     friend class Iterator;

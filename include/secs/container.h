@@ -24,7 +24,7 @@ public:
   void destroy(const Entity& entity);
 
   template<typename... Ts>
-  EntityView<Ts...> all();
+  EntityView<Ts...> entities();
 
   size_t size() const {
     return _capacity - _holes.size();
@@ -59,7 +59,10 @@ private:
   void copy(const Entity& source, const Entity& target);
   void move(const Entity& source, const Entity& target);
 
-  void after_destroy(size_t index);
+  template<typename T>
+  void emit_on_create(const Entity& entity, const ComponentPtr<T>&) const;
+
+  void cleanup(size_t index);
 
 private:
 
