@@ -85,4 +85,4 @@ private:
   Destroy _destroy = nullptr;
 };
 
-}; // namespace secs
+} // namespace secs

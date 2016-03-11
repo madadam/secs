@@ -1,6 +1,7 @@
 #pragma once
 
-#include <boost/container/flat_map.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace secs {
 
@@ -25,7 +26,26 @@ private:
     }
   };
 
-  mutable boost::container::flat_map<Key, size_t> _map;
+  struct KeyComparer {
+    bool operator () ( const std::pair<Key, size_t>& a
+                     , const std::pair<Key, size_t>& b) const
+    {
+      return a.first < b.first;
+    }
+
+    bool operator () (const std::pair<Key, size_t>& a, Key b) const {
+      return a.first < b;
+    }
+
+    bool operator () (Key a, const std::pair<Key, size_t>& b) const {
+      return a < b.first;
+    }
+  };
+
+
+  // Sorted vector so we can look stuff up using binary search
+  // (lower_bound/upper_bound algorithms)
+  mutable std::vector<std::pair<Key, size_t>> _map;
   mutable size_t _next = 0;
 
 public:
@@ -33,10 +53,14 @@ public:
   template<typename T>
   size_t get() const {
     auto key = KeyGen<T>::value();
-    auto it = _map.find(key);
+    auto it = std::lower_bound(_map.begin(), _map.end(), key, KeyComparer());
 
-    if (it == _map.end()) {
-      it = _map.insert(it, std::make_pair(key, _next++));
+    if (it == _map.end() || it->first != key) {
+      it = _map.insert( std::upper_bound( _map.begin()
+                                        , _map.end()
+                                        , key
+                                        , KeyComparer())
+                      , { key, _next++ });
     }
 
     return it->second;

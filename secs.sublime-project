@@ -7,8 +7,9 @@
       [
         "*.cpp",
         "*.h",
-        "Makefile",
+        "CMakeLists.txt",
         "README.md",
+        "run"
       ],
 		}
 	]

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+case $1 in
+update)
+  rm -rf build
+  mkdir -p build/debug
+  mkdir -p build/release
+  (cd build/debug   && cmake -DCMAKE_BUILD_TYPE=Debug   ../.. || exit)
+  (cd build/release && cmake -DCMAKE_BUILD_TYPE=Release ../.. || exit)
+  ;;
+build)
+  make -C build/debug
+  ;;
+release)
+  make -C build/release
+  ;;
+test)
+  make -C build/debug tests && ./build/debug/tests
+  ;;
+bench)
+  make -C build/release benchmarks && ./build/release/benchmarks
+  ;;
+*)
+  echo "Usage: run [update|build|release|test|bench]"
+  ;;
+esac
