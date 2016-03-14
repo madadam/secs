@@ -95,11 +95,10 @@ private:
   TypeKeyedMap<ComponentOps>  _ops;
   EventManager                _event_manager;
 
-  template<typename> friend class ComponentPtr;
   friend class Entity;
   template<typename, typename, typename> friend class EntityView;
 };
 
 } // namespace secs
 
-#include "container.inline.h"
+#include "implementation.h"

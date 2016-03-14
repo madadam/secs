@@ -1,7 +1,5 @@
 #include "catch.hpp"
-#include "secs/container.h"
-#include "secs/entity.h"
-#include "secs/lifetime_subscriber.h"
+#include "secs.h"
 
 // DEBUG
 #include <iostream>
@@ -26,7 +24,7 @@ public:
 };
 
 struct EntityAwareComponent {
-  Entity self = nullptr;
+  Entity self;
 };
 
 void on_create(Entity e, ComponentPtr<EntityAwareComponent> c) {
@@ -324,6 +322,18 @@ TEST_CASE("Non-POD Components") {
   for (auto c : container.entities().need<Name>()) {
     auto name = c.get<Name>().name;
   }
+}
+
+TEST_CASE("ComponentView") {
+  Container container;
+
+  auto e  = container.create();
+  auto c0 = e.create_component<Position>(123, 456);
+  auto c1 = e.create_component<Velocity>();
+
+  auto cs = e.components<Position, Velocity>();
+  CHECK(&cs.get<Position>() == c0.get());
+  CHECK(&cs.get<Velocity>() == c1.get());
 }
 
 TEST_CASE("Lifetime events") {

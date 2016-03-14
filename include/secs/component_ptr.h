@@ -9,10 +9,13 @@ namespace secs {
 template<typename T>
 class ComponentPtr {
 public:
-  ComponentPtr(std::nullptr_t)
+  ComponentPtr()
     : _store(nullptr)
     , _index(0)
     , _version(0)
+  {}
+
+  ComponentPtr(std::nullptr_t) : ComponentPtr()
   {}
 
   explicit operator bool () const {

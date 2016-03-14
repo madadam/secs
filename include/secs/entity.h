@@ -7,21 +7,23 @@
 namespace secs {
 
 template<typename> class ComponentPtr;
+template<typename...> class ComponentView;
 class Container;
 
 class Entity {
 public:
-  Entity(std::nullptr_t)
+  Entity()
     : _container(nullptr)
     , _index(0)
     , _version(0)
   {}
 
-  Entity& operator = (std::nullptr_t);
-
   explicit operator bool () const;
 
   template<typename T> ComponentPtr<T> component() const;
+
+  template<typename... Ts>
+  ComponentView<Ts...> components() const;
 
   // Create a Component of the given type using the given arguments for the
   // Component constructor.
@@ -66,11 +68,8 @@ private:
   friend bool operator < (const Entity&, const Entity&);
 };
 
-inline bool operator == (const Entity& e, std::nullptr_t) { return !(bool) e; }
-inline bool operator != (const Entity& e, std::nullptr_t) { return  (bool) e; }
-
 inline bool operator != (const Entity& a, const Entity& b) { return !(a == b); }
 
 } // namespace secs
 
-#include "container.inline.h"
+#include "implementation.h"

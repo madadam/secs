@@ -3,14 +3,6 @@
 
 using namespace secs;
 
-Entity& Entity::operator = (std::nullptr_t) {
-  _container = nullptr;
-  _index = 0;
-  _version = 0;
-
-  return *this;
-}
-
 Entity::operator bool () const {
   return _container && _version > 0 && _container->get_version(_index) == _version;
 }
