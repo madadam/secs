@@ -17,7 +17,7 @@ public:
   {}
 
   explicit operator bool () const {
-    return _version > 0 && all(_stores, [=](auto store) {
+    return _version > 0 && detail::all(_stores, [=](auto store) {
       return store && store->contains(_index, _version);
     });
   }

@@ -23,14 +23,6 @@ public:
   std::string name;
 };
 
-struct EntityAwareComponent {
-  Entity self;
-};
-
-void on_create(Entity e, ComponentPtr<EntityAwareComponent> c) {
-  c->self = e;
-}
-
 class PositionSubscriber : public LifetimeSubscriber<Position> {
 public:
   int creates = 0;
@@ -298,6 +290,36 @@ TEST_CASE("Move Component between different Containers") {
   CHECK(i1->y == 456);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+struct MovableComponent {
+  bool moved = false;
+
+  MovableComponent() = default;
+
+  MovableComponent(const MovableComponent&)
+    : moved(false)
+  {}
+
+  MovableComponent(MovableComponent&&)
+    : moved(true)
+  {}
+};
+
+TEST_CASE("Moving Component invokes its move constructor") {
+  Container container0;
+  Container container1;
+
+  auto e0 = container0.create();
+  auto e1 = container1.create();
+
+  auto c0 = e0.create_component<MovableComponent>();
+  CHECK(!c0->moved);
+
+  auto c1 = e1.create_component<MovableComponent>(std::move(*c0));
+  CHECK(c1->moved);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 TEST_CASE("Destroy Component") {
   Container container;
   auto e = container.create();
@@ -389,10 +411,52 @@ TEST_CASE("Lifetime events on move") {
   CHECK(subscriber1.destroys == 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+struct ComponentWithCallbacks {
+  bool created = false;
+  bool copied  = false;
+  bool moved   = false;
+
+  std::function<void()> destroyed;
+};
+
+void on_create(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+  c->created = true;
+}
+
+void on_copy(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+  c->copied = true;
+}
+
+void on_move(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+  c->moved = true;
+}
+
+void on_destroy(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+  if (c->destroyed) c->destroyed();
+}
+
 TEST_CASE("Lifetime callbacks") {
   Container container;
-  auto e = container.create();
-  auto c = e.create_component<EntityAwareComponent>();
+  auto e0 = container.create();
 
-  CHECK(c->self == e);
+  auto c0 = e0.create_component<ComponentWithCallbacks>();
+  CHECK(c0->created);
+
+  auto e1 = e0.copy();
+  auto c1 = e1.component<ComponentWithCallbacks>();
+  CHECK(c1->copied);
+
+  auto e2 = container.create();
+  auto c2 = e2.create_component<ComponentWithCallbacks>(std::move(*c0));
+  CHECK(c2->moved);
+
+  auto e3 = container.create();
+  auto c3 = e3.create_component<ComponentWithCallbacks>();
+
+  bool destroyed = false;
+  c3->destroyed = [&]() { destroyed = true; };
+
+  e3.destroy_component<ComponentWithCallbacks>();
+  CHECK(destroyed);
 }

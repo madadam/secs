@@ -10,6 +10,26 @@
 namespace secs {
 
 // Container implementation
+template<typename T, typename... Args>
+struct InvokeOnCreate {
+  void operator () (const Entity&, const ComponentPtr<T>&) const;
+};
+
+template<typename T>
+struct InvokeOnCreate<T, const T&> {
+  void operator () (const Entity&, const ComponentPtr<T>&) const;
+};
+
+template<typename T>
+struct InvokeOnCreate<T, T&> {
+  void operator () (const Entity&, const ComponentPtr<T>&) const;
+};
+
+template<typename T>
+struct InvokeOnCreate<T, T&&> {
+  void operator () (const Entity&, const ComponentPtr<T>&) const;
+};
+
 inline EntityView<std::tuple<>, std::tuple<>, std::tuple<>>
 Container::entities() {
   return { *this };
@@ -31,7 +51,10 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
   ComponentPtr<T> component(s, entity._index, entity._version);
 
-  emit_on_create(entity, component);
+  InvokeOnCreate<T, decltype(args)...>()(entity, component);
+
+  secs::OnCreate<T> event{ entity, component };
+  _event_manager.emit(event);
 
   return component;
 }
@@ -41,7 +64,11 @@ void Container::destroy_component(const Entity& entity) {
   auto& s = store<T>();
   assert(s.contains(entity._index, entity._version));
 
-  OnDestroy<T> event{ entity, { s, entity._index, entity._version } };
+  ComponentPtr<T> component(s, entity._index, entity._version);
+
+  invoke_on_destroy(entity, component);
+
+  OnDestroy<T> event{ entity, component };
   _event_manager.emit(event);
 
   s.erase(entity._index);
@@ -112,10 +139,6 @@ ComponentView<Ts...> Entity::components() const {
   return { std::make_tuple(&_container->store<Ts>()...), _index, _version };
 }
 
-template<typename T>
-void on_create(const Entity&, const ComponentPtr<T>&) {}
-
-
 // ComponentView implementation
 template<typename... Ts>
 ComponentView<Ts...>::ComponentView(
@@ -131,17 +154,67 @@ ComponentView<Ts...>::ComponentView(
 
 // This needs to be defined outside of any namespace, as it exploits Argument
 // Dependent Lookup.
-template<typename T>
-void
-secs::Container::emit_on_create( const secs::Entity&          entity
-                               , const secs::ComponentPtr<T>& component) const
+
+template<typename T, typename... Args>
+void secs::InvokeOnCreate<T, Args...>::operator () (
+  const secs::Entity& entity, const secs::ComponentPtr<T>& component
+) const
 {
   using secs::on_create;
-
-  // Static on_create callback (at most one per type).
   on_create(entity, component);
-
-  // Dynamic on_create subscribers.
-  secs::OnCreate<T> event{ entity, component };
-  _event_manager.emit(event);
 }
+
+template<typename T>
+void secs::InvokeOnCreate<T, const T&>::operator () (
+  const secs::Entity& entity, const secs::ComponentPtr<T>& component
+) const
+{
+  using secs::on_create;
+  on_copy(entity, component);
+}
+
+template<typename T>
+void secs::InvokeOnCreate<T, T&>::operator () (
+  const secs::Entity& entity, const secs::ComponentPtr<T>& component
+) const
+{
+  using secs::on_create;
+  on_copy(entity, component);
+}
+
+template<typename T>
+void secs::InvokeOnCreate<T, T&&>::operator () (
+  const secs::Entity& entity, const secs::ComponentPtr<T>& component
+) const
+{
+  using secs::on_create;
+  on_move(entity, component);
+}
+
+template<typename T>
+void secs::invoke_on_destroy( const secs::Entity&          entity
+                            , const secs::ComponentPtr<T>& component)
+{
+  using secs::on_destroy;
+  on_destroy(entity, component);
+}
+
+// Default lifetime callbacks.
+
+template<typename T>
+void secs::on_create(const Entity&, const ComponentPtr<T>&) {}
+
+template<typename T>
+void secs::on_copy(const Entity& entity, const ComponentPtr<T>& component) {
+  using secs::on_create;
+  on_create(entity, component);
+}
+
+template<typename T>
+void secs::on_move(const Entity& entity, const ComponentPtr<T>& component) {
+  using secs::on_create;
+  on_create(entity, component);
+}
+
+template<typename T>
+void secs::on_destroy(const Entity&, const ComponentPtr<T>&) {}

@@ -99,6 +99,14 @@ private:
   template<typename, typename, typename> friend class EntityView;
 };
 
+template<typename, typename...> struct InvokeOnCreate;
+template<typename T> void invoke_on_destroy(const Entity&, const ComponentPtr<T>&);
+
+template<typename T> void on_create (const Entity&, const ComponentPtr<T>&);
+template<typename T> void on_copy   (const Entity&, const ComponentPtr<T>&);
+template<typename T> void on_move   (const Entity&, const ComponentPtr<T>&);
+template<typename T> void on_destroy(const Entity&, const ComponentPtr<T>&);
+
 } // namespace secs
 
 #include "implementation.h"
