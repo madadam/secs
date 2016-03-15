@@ -86,6 +86,16 @@ void Container::unsubscribe(LifetimeSubscriber<T>& subscriber) {
   _event_manager.unsubscribe<OnDestroy<T>>(subscriber);
 }
 
+template<typename T0, typename T1, typename... Ts>
+void Container::prioritize() const {
+  prioritize<T0>();
+  prioritize<T1, Ts...>();
+}
+
+template<typename T>
+void Container::prioritize() const {
+  _ops.find<T>();
+}
 
 // ComponentOps implementation
 template<typename T>

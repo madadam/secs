@@ -38,6 +38,10 @@ public:
   template<typename T> void subscribe  (LifetimeSubscriber<T>& subscriber);
   template<typename T> void unsubscribe(LifetimeSubscriber<T>& subscriber);
 
+  // Specify in what order Component types are processed.
+  template<typename T0, typename T1, typename... Ts> void prioritize() const;
+  template<typename T> void prioritize() const;
+
 private:
   struct Meta {
     bool     exists  = false;

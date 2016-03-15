@@ -460,3 +460,42 @@ TEST_CASE("Lifetime callbacks") {
   e3.destroy_component<ComponentWithCallbacks>();
   CHECK(destroyed);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+template<int I>
+struct Number {
+  static const int value = I;
+  std::vector<int>& order;
+
+  Number(std::vector<int>& order)
+    : order(order)
+  {}
+
+  Number(const Number& other) : order(other.order) {
+    order.push_back(value);
+  }
+
+  Number(Number&& other) = default;
+};
+
+template<int I> const int Number<I>::value;
+
+TEST_CASE("Copy order") {
+  Container container;
+  container.prioritize<Number<1>, Number<2>>();
+
+  auto e0 = container.create();
+
+  std::vector<int> order;
+
+  e0.create_component<Number<0>>(order);
+  e0.create_component<Number<1>>(order);
+  e0.create_component<Number<2>>(order);
+
+  e0.copy();
+
+  CHECK(order[0] == 1);
+  CHECK(order[1] == 2);
+  CHECK(order[2] == 0);
+}
+
