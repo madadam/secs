@@ -14,6 +14,8 @@ namespace secs {
 //   assert(ti.get<Foo>() == ti.get<Foo>());
 //   assert(ti.get<Bar>() != ti.get<Foo>());
 //
+//
+// TODO: optimize this
 struct TypeIndex {
 private:
   typedef void (*Key)();

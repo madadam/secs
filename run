@@ -15,7 +15,7 @@ release)
   make -C build/release
   ;;
 test)
-  make -C build/debug tests && ./build/debug/tests
+  make -C build/debug tests && ./build/debug/tests "${@:2}"
   ;;
 bench)
   make -C build/release benchmarks && ./build/release/benchmarks

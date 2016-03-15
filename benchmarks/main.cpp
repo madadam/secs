@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include <chrono>
 #include "secs/container.h"
@@ -30,10 +31,11 @@ void benchmark(const string& label, F&& body) {
   body();
   auto t1 = chrono::high_resolution_clock::now();
 
-  cout << label
+  cout << std::left << std::setw(40) << label
        << ": "
+       << std::right << std::setw(8)
        << chrono::duration_cast<chrono::nanoseconds>(t1 - t0).count()
-       << "ns\n";
+       << " ns\n";
 }
 
 static std::default_random_engine gen;

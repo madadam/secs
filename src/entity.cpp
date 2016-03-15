@@ -7,11 +7,11 @@ Entity::operator bool () const {
   return _container && _version > 0 && _container->get_version(_index) == _version;
 }
 
-Entity Entity::copy() {
+Entity Entity::copy() const {
   return copy_to(*_container);
 }
 
-Entity Entity::copy_to(Container& target) {
+Entity Entity::copy_to(Container& target) const {
   assert(*this);
 
   auto result = target.create();

@@ -7,28 +7,10 @@
 #include "secs/entity_view.h"
 #include "secs/lifetime_subscriber.h"
 
+// DEBUG
+#include <iostream>
+
 namespace secs {
-
-// Container implementation
-template<typename T, typename... Args>
-struct InvokeOnCreate {
-  void operator () (const Entity&, const ComponentPtr<T>&) const;
-};
-
-template<typename T>
-struct InvokeOnCreate<T, const T&> {
-  void operator () (const Entity&, const ComponentPtr<T>&) const;
-};
-
-template<typename T>
-struct InvokeOnCreate<T, T&> {
-  void operator () (const Entity&, const ComponentPtr<T>&) const;
-};
-
-template<typename T>
-struct InvokeOnCreate<T, T&&> {
-  void operator () (const Entity&, const ComponentPtr<T>&) const;
-};
 
 inline EntityView<std::tuple<>, std::tuple<>, std::tuple<>>
 Container::entities() {
@@ -47,11 +29,11 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   assert(!s.contains(entity._index));
 
   _ops.get<T>().template setup<T>();
-
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
+
   ComponentPtr<T> component(s, entity._index, entity._version);
 
-  InvokeOnCreate<T, decltype(args)...>()(entity, component);
+  invoke_on_create(entity, component);
 
   secs::OnCreate<T> event{ entity, component };
   _event_manager.emit(event);
@@ -86,39 +68,33 @@ void Container::unsubscribe(LifetimeSubscriber<T>& subscriber) {
   _event_manager.unsubscribe<OnDestroy<T>>(subscriber);
 }
 
-template<typename T0, typename T1, typename... Ts>
-void Container::prioritize() const {
-  prioritize<T0>();
-  prioritize<T1, Ts...>();
-}
-
-template<typename T>
-void Container::prioritize() const {
-  _ops.find<T>();
-}
-
 // ComponentOps implementation
 template<typename T>
 typename std::enable_if<std::is_copy_constructible<T>::value, void>::type
 ComponentOps::copy(const Entity& source, const Entity& target) {
-  target.create_component<T>(*source.component<T>());
+  if (source.component<T>()) {
+    target.copy_component_from<T>(source);
+  }
 }
 
 template<typename T>
 typename std::enable_if<!std::is_copy_constructible<T>::value, void>::type
-ComponentOps::copy(const Entity&, const Entity&) {
-  assert(false);
+ComponentOps::copy(const Entity& source, const Entity&) {
+  assert(!source.component<T>());
 }
 
 template<typename T>
 void ComponentOps::move(const Entity& source, const Entity& target) {
-  target.create_component<T>(std::move(*source.component<T>()));
-  source.destroy_component<T>();
+  if (source.component<T>()) {
+    target.move_component_from<T>(source);
+  }
 }
 
 template<typename T>
 void ComponentOps::destroy(const Entity& entity) {
-  entity.destroy_component<T>();
+  if (entity.component<T>()) {
+    entity.destroy_component<T>();
+  }
 }
 
 
@@ -135,6 +111,21 @@ ComponentPtr<T> Entity::create_component(Args&&... args) const {
 
   assert(*this);
   return _container->create_component<T>(*this, std::forward<Args>(args)...);
+}
+
+template<typename T>
+ComponentPtr<T> Entity::copy_component_from(const Entity& source) const {
+  auto result = create_component<T>(*source.component<T>());
+  invoke_on_copy(source, *this, result);
+  return result;
+}
+
+template<typename T>
+ComponentPtr<T> Entity::move_component_from(const Entity& source) const {
+  auto result = create_component<T>(std::move(*source.component<T>()));
+  source.destroy_component<T>();
+  invoke_on_move(source, *this, result);
+  return result;
 }
 
 template<typename T>
@@ -165,40 +156,12 @@ ComponentView<Ts...>::ComponentView(
 // This needs to be defined outside of any namespace, as it exploits Argument
 // Dependent Lookup.
 
-template<typename T, typename... Args>
-void secs::InvokeOnCreate<T, Args...>::operator () (
-  const secs::Entity& entity, const secs::ComponentPtr<T>& component
-) const
+template<typename T>
+void secs::invoke_on_create( const secs::Entity&          entity
+                           , const secs::ComponentPtr<T>& component)
 {
   using secs::on_create;
   on_create(entity, component);
-}
-
-template<typename T>
-void secs::InvokeOnCreate<T, const T&>::operator () (
-  const secs::Entity& entity, const secs::ComponentPtr<T>& component
-) const
-{
-  using secs::on_create;
-  on_copy(entity, component);
-}
-
-template<typename T>
-void secs::InvokeOnCreate<T, T&>::operator () (
-  const secs::Entity& entity, const secs::ComponentPtr<T>& component
-) const
-{
-  using secs::on_create;
-  on_copy(entity, component);
-}
-
-template<typename T>
-void secs::InvokeOnCreate<T, T&&>::operator () (
-  const secs::Entity& entity, const secs::ComponentPtr<T>& component
-) const
-{
-  using secs::on_create;
-  on_move(entity, component);
 }
 
 template<typename T>
@@ -209,22 +172,34 @@ void secs::invoke_on_destroy( const secs::Entity&          entity
   on_destroy(entity, component);
 }
 
+template<typename T>
+void secs::invoke_on_copy( const secs::Entity&          source
+                         , const secs::Entity&          target
+                         , const secs::ComponentPtr<T>& component)
+{
+  using secs::on_copy;
+  on_copy(source, target, component);
+}
+
+template<typename T>
+void secs::invoke_on_move( const secs::Entity&          source
+                         , const secs::Entity&          target
+                         , const secs::ComponentPtr<T>& component)
+{
+  using secs::on_move;
+  on_move(source, target, component);
+}
+
 // Default lifetime callbacks.
 
 template<typename T>
 void secs::on_create(const Entity&, const ComponentPtr<T>&) {}
 
 template<typename T>
-void secs::on_copy(const Entity& entity, const ComponentPtr<T>& component) {
-  using secs::on_create;
-  on_create(entity, component);
-}
+void secs::on_copy(const Entity&, const Entity&, const ComponentPtr<T>&) {}
 
 template<typename T>
-void secs::on_move(const Entity& entity, const ComponentPtr<T>& component) {
-  using secs::on_create;
-  on_create(entity, component);
-}
+void secs::on_move(const Entity&, const Entity&, const ComponentPtr<T>&) {}
 
 template<typename T>
 void secs::on_destroy(const Entity&, const ComponentPtr<T>&) {}

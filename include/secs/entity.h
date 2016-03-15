@@ -39,6 +39,9 @@ public:
     }
   }
 
+  template<typename T> ComponentPtr<T> copy_component_from(const Entity&) const;
+  template<typename T> ComponentPtr<T> move_component_from(const Entity&) const;
+
   // Destroys the Component of the given type.
   template<typename T> void destroy_component() const;
 
@@ -46,8 +49,8 @@ public:
     return *_container;
   }
 
-  Entity copy();
-  Entity copy_to(Container&);
+  Entity copy() const;
+  Entity copy_to(Container&) const;
   Entity move_to(Container&);
   void destroy() const;
 

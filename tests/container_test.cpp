@@ -103,7 +103,7 @@ TEST_CASE("Copy entity") {
   }
 }
 
-TEST_CASE("Move entity") {
+TEST_CASE("Move Entity") {
   Container container0;
   Container container1;
   auto e0 = container0.create();
@@ -125,7 +125,7 @@ TEST_CASE("Move entity") {
   CHECK(e1.component<Position>()->y == 456);
 }
 
-TEST_CASE("Iterate over entities") {
+TEST_CASE("Iterate over Entities") {
   Container container;
   size_t counter = 0;
 
@@ -230,7 +230,7 @@ TEST_CASE("Copy Component in the same Container") {
   auto e1 = container.create();
 
   e0.create_component<Position>(123, 456);
-  e1.create_component<Position>(*e0.component<Position>());
+  e1.copy_component_from<Position>(e0);
 
   auto i0 = e0.component<Position>();
   auto i1 = e1.component<Position>();
@@ -249,7 +249,7 @@ TEST_CASE("Copy Component between different Containers") {
   auto e1 = container1.create();
 
   e0.create_component<Position>(123, 456);
-  e1.create_component<Position>(*e0.component<Position>());
+  e1.copy_component_from<Position>(e0);
 
   auto i0 = e0.component<Position>();
   auto i1 = e1.component<Position>();
@@ -266,7 +266,7 @@ TEST_CASE("Move Component in the same Container") {
   auto e1 = container.create();
 
   e0.create_component<Position>(123, 456);
-  e1.create_component<Position>(std::move(*e0.component<Position>()));
+  e1.move_component_from<Position>(e0);
 
   auto i1 = e1.component<Position>();
   CHECK(i1);
@@ -282,7 +282,7 @@ TEST_CASE("Move Component between different Containers") {
   auto e1 = container1.create();
 
   e0.create_component<Position>(123, 456);
-  e1.create_component<Position>(std::move(*e0.component<Position>()));
+  e1.move_component_from<Position>(e0);
 
   auto i1 = e1.component<Position>();
   CHECK(i1);
@@ -315,7 +315,7 @@ TEST_CASE("Moving Component invokes its move constructor") {
   auto c0 = e0.create_component<MovableComponent>();
   CHECK(!c0->moved);
 
-  auto c1 = e1.create_component<MovableComponent>(std::move(*c0));
+  auto c1 = e1.move_component_from<MovableComponent>(e0);
   CHECK(c1->moved);
 }
 
@@ -424,11 +424,11 @@ void on_create(Entity, ComponentPtr<ComponentWithCallbacks> c) {
   c->created = true;
 }
 
-void on_copy(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+void on_copy(Entity, Entity, ComponentPtr<ComponentWithCallbacks> c) {
   c->copied = true;
 }
 
-void on_move(Entity, ComponentPtr<ComponentWithCallbacks> c) {
+void on_move(Entity, Entity, ComponentPtr<ComponentWithCallbacks> c) {
   c->moved = true;
 }
 
@@ -448,7 +448,7 @@ TEST_CASE("Lifetime callbacks") {
   CHECK(c1->copied);
 
   auto e2 = container.create();
-  auto c2 = e2.create_component<ComponentWithCallbacks>(std::move(*c0));
+  auto c2 = e2.move_component_from<ComponentWithCallbacks>(e0);
   CHECK(c2->moved);
 
   auto e3 = container.create();
@@ -460,42 +460,3 @@ TEST_CASE("Lifetime callbacks") {
   e3.destroy_component<ComponentWithCallbacks>();
   CHECK(destroyed);
 }
-
-////////////////////////////////////////////////////////////////////////////////
-template<int I>
-struct Number {
-  static const int value = I;
-  std::vector<int>& order;
-
-  Number(std::vector<int>& order)
-    : order(order)
-  {}
-
-  Number(const Number& other) : order(other.order) {
-    order.push_back(value);
-  }
-
-  Number(Number&& other) = default;
-};
-
-template<int I> const int Number<I>::value;
-
-TEST_CASE("Copy order") {
-  Container container;
-  container.prioritize<Number<1>, Number<2>>();
-
-  auto e0 = container.create();
-
-  std::vector<int> order;
-
-  e0.create_component<Number<0>>(order);
-  e0.create_component<Number<1>>(order);
-  e0.create_component<Number<2>>(order);
-
-  e0.copy();
-
-  CHECK(order[0] == 1);
-  CHECK(order[1] == 2);
-  CHECK(order[2] == 0);
-}
-

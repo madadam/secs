@@ -38,10 +38,6 @@ public:
   template<typename T> void subscribe  (LifetimeSubscriber<T>& subscriber);
   template<typename T> void unsubscribe(LifetimeSubscriber<T>& subscriber);
 
-  // Specify in what order Component types are processed.
-  template<typename T0, typename T1, typename... Ts> void prioritize() const;
-  template<typename T> void prioritize() const;
-
 private:
   struct Meta {
     bool     exists  = false;
@@ -84,9 +80,6 @@ private:
   void copy(const Entity& source, const Entity& target);
   void move(const Entity& source, const Entity& target);
 
-  template<typename T>
-  void emit_on_create(const Entity& entity, const ComponentPtr<T>&) const;
-
   void cleanup(size_t index);
 
 private:
@@ -104,11 +97,33 @@ private:
 };
 
 template<typename, typename...> struct InvokeOnCreate;
-template<typename T> void invoke_on_destroy(const Entity&, const ComponentPtr<T>&);
 
-template<typename T> void on_create (const Entity&, const ComponentPtr<T>&);
-template<typename T> void on_copy   (const Entity&, const ComponentPtr<T>&);
-template<typename T> void on_move   (const Entity&, const ComponentPtr<T>&);
+template<typename T>
+void invoke_on_create(const Entity& entity, const ComponentPtr<T>&);
+
+template<typename T>
+void invoke_on_copy( const Entity& source
+                   , const Entity& target
+                   , const ComponentPtr<T>&);
+
+template<typename T>
+void invoke_on_move( const Entity& source
+                   , const Entity& target
+                   , const ComponentPtr<T>&);
+
+template<typename T>
+void invoke_on_destroy(const Entity&, const ComponentPtr<T>&);
+
+template<typename T> void on_create(const Entity&, const ComponentPtr<T>&);
+
+template<typename T> void on_copy( const Entity&
+                                 , const Entity&
+                                 , const ComponentPtr<T>&);
+
+template<typename T> void on_move( const Entity&
+                                 , const Entity&
+                                 , const ComponentPtr<T>&);
+
 template<typename T> void on_destroy(const Entity&, const ComponentPtr<T>&);
 
 } // namespace secs
