@@ -141,6 +141,25 @@ auto slice(const Omniset& set) {
   return help::Slice<T>()(set);
 }
 
+
+// Call entity.components, but use the types from the tuple T
+namespace help {
+template<typename T>
+struct Components;
+
+template<typename... Ts>
+struct Components<std::tuple<Ts...>> {
+  auto operator () (const Entity& entity) const {
+    return entity.components<Ts...>();
+  }
+};
+}
+
+template<typename T>
+auto components(const Entity& entity) {
+  return help::Components<T>()(entity);
+}
+
 } // namespace detail
 
 // Base EntityView
@@ -168,6 +187,10 @@ public:
       static_assert( detail::Contains<Load, typename std::remove_pointer<T>::type>
                    , "T is not among loaded Component types");
       return std::get<T>(_load);
+    }
+
+    auto all() const {
+      return detail::components<Need>(_entity);
     }
 
   private:

@@ -353,9 +353,13 @@ TEST_CASE("ComponentView") {
   auto c0 = e.create_component<Position>(123, 456);
   auto c1 = e.create_component<Velocity>();
 
-  auto cs = e.components<Position, Velocity>();
-  CHECK(&cs.get<Position>() == c0.get());
-  CHECK(&cs.get<Velocity>() == c1.get());
+  auto cs0 = e.components<Position, Velocity>();
+  CHECK(&cs0.get<Position>() == c0.get());
+  CHECK(&cs0.get<Velocity>() == c1.get());
+
+  auto cs1 = make_component_view(c0, c1);
+  CHECK(&cs1.get<Position>() == c0.get());
+  CHECK(&cs1.get<Velocity>() == c1.get());
 }
 
 TEST_CASE("Lifetime events") {
