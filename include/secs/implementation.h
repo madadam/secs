@@ -102,7 +102,7 @@ template<typename... Ts>
 ComponentView<Ts...>::ComponentView(
     const std::tuple<ComponentStore<Ts>*...>& stores
   , size_t                                    index
-  , uint64_t                                  version)
+  , Version                                   version)
   : _stores(stores)
   , _index(index)
   , _version(version)

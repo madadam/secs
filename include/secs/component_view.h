@@ -40,7 +40,7 @@ public:
   {}
 
   explicit operator bool () const {
-    return _version > 0 && detail::all(_stores, [=](auto store) {
+    return _version.exists() && detail::all(_stores, [=](auto store) {
       return store && store->contains(_index, _version);
     });
   }
@@ -51,7 +51,7 @@ public:
                  , "This view does not contain T");
 
     auto store = std::get<ComponentStore<T>*>(_stores);
-    assert(_version > 0 && store && store->contains(_index, _version));
+    assert(_version.exists() && store && store->contains(_index, _version));
 
     return store->get(_index);
   }
@@ -70,12 +70,12 @@ public:
 private:
   ComponentView( const std::tuple<ComponentStore<Ts>*...>& stores
                , size_t                                    index
-               , uint64_t                                  version);
+               , Version                                   version);
 
 private:
   std::tuple<ComponentStore<Ts>*...> _stores;
   size_t                             _index;
-  uint64_t                           _version;
+  Version                            _version;
 
   friend class Entity;
 

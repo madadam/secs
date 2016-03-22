@@ -4,7 +4,9 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+
 #include "secs/store.h"
+#include "secs/version.h"
 
 namespace secs {
 
@@ -21,13 +23,13 @@ namespace detail {
 
   template<typename T>
   std::enable_if_t<!std::is_trivially_copyable<T>::value, void>
-  move( Store<T>*                    dst
-      , Store<T>*                    src
-      , size_t                       count
-      , const std::vector<uint64_t>& versions)
+  move( Store<T>*                   dst
+      , Store<T>*                   src
+      , size_t                      count
+      , const std::vector<Version>& versions)
   {
     for (size_t i = 0; i < count; ++i) {
-      if (versions[i] > 0) {
+      if (versions[i].exists()) {
         new (ptr<T>(dst, i)) T(std::move(*ptr<T>(src, i)));
       }
     }
@@ -37,7 +39,7 @@ namespace detail {
   // memcpy.
   template<typename T>
   std::enable_if_t<std::is_trivially_copyable<T>::value, void>
-  move(Store<T>* dst, Store<T>* src, size_t count, const std::vector<uint64_t>&) {
+  move(Store<T>* dst, Store<T>* src, size_t count, const std::vector<Version>&) {
     std::memcpy( reinterpret_cast<void*>(dst)
                , reinterpret_cast<void*>(src)
                , count * store_size<T>);
@@ -54,7 +56,7 @@ public:
 
   ~ComponentStore() {
     for (size_t i = 0; i < size(); ++i) {
-      if (_versions[i] > 0) ptr(i)->~T();
+      if (_versions[i].exists()) ptr(i)->~T();
     }
   }
 
@@ -65,12 +67,12 @@ public:
     return _versions.size();
   }
 
-  bool contains(size_t index, uint64_t version) const {
+  bool contains(size_t index, Version version) const {
     return index < _versions.size() && _versions[index] == version;
   }
 
   bool contains(size_t index) const {
-    return index < _versions.size() && _versions[index] > 0;
+    return index < _versions.size() && _versions[index].exists();
   }
 
   T& get(size_t index) {
@@ -84,17 +86,17 @@ public:
   }
 
   template<typename... Args>
-  void emplace(size_t index, uint64_t version, Args&&... args);
+  void emplace(size_t index, Version version, Args&&... args);
 
-  void emplace(size_t index, uint64_t version, const T& other);
-  void emplace(size_t index, uint64_t version, T& other);
-  void emplace(size_t index, uint64_t version, T&& other);
+  void emplace(size_t index, Version version, const T& other);
+  void emplace(size_t index, Version version, T& other);
+  void emplace(size_t index, Version version, T&& other);
 
   void erase(size_t index) {
-    if (_versions[index] == 0) return;
+    if (!_versions[index].exists()) return;
 
     ptr(index)->~T();
-    _versions[index] = 0;
+    _versions[index].destroy();
   }
 
 
@@ -127,12 +129,12 @@ private:
 
   template<typename... Args>
   void emplace_without_invalidation_check( size_t    index
-                                         , uint64_t  version
+                                         , Version   version
                                          , Args&&... args)
   {
     reserve_for(index);
 
-    if (_versions[index] > 0) {
+    if (_versions[index].exists()) {
       ptr(index)->~T();
     }
 
@@ -149,13 +151,13 @@ private:
 
 private:
 
-  std::vector<uint64_t>   _versions;
+  std::vector<Version>    _versions;
   std::unique_ptr<Slot[]> _data;
 };
 
 template<typename T> template<typename... Args>
 void ComponentStore<T>::emplace( size_t    index
-                               , uint64_t  version
+                               , Version   version
                                , Args&&... args)
 {
   emplace_without_invalidation_check( index
@@ -167,7 +169,7 @@ void ComponentStore<T>::emplace( size_t    index
 // when the target storage has to be reallocated.
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, uint64_t version, T& other) {
+void ComponentStore<T>::emplace(size_t index, Version version, T& other) {
   if (will_invalidate(index, &other)) {
     T temp(other);
     emplace_without_invalidation_check(index, version, std::move(temp));
@@ -177,7 +179,7 @@ void ComponentStore<T>::emplace(size_t index, uint64_t version, T& other) {
 }
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, uint64_t version, const T& other) {
+void ComponentStore<T>::emplace(size_t index, Version version, const T& other) {
   if (will_invalidate(index, &other)) {
     T temp(other);
     emplace_without_invalidation_check(index, version, std::move(temp));
@@ -187,7 +189,7 @@ void ComponentStore<T>::emplace(size_t index, uint64_t version, const T& other) 
 }
 
 template<typename T>
-void ComponentStore<T>::emplace(size_t index, uint64_t version, T&& other) {
+void ComponentStore<T>::emplace(size_t index, Version version, T&& other) {
   if (will_invalidate(index, &other)) {
     T temp(std::move(other));
     emplace_without_invalidation_check(index, version, std::move(temp));

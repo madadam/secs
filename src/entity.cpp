@@ -4,7 +4,7 @@
 using namespace secs;
 
 Entity::operator bool () const {
-  return _container && _version > 0 && _container->get_version(_index) == _version;
+  return _container && _container->contains(_index, _version);
 }
 
 Entity Entity::copy() const {

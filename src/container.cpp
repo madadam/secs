@@ -12,11 +12,11 @@ Entity Container::create() {
     _holes.pop_back();
   }
 
-  if (index >= _meta.size()) {
-    _meta.resize(index + 1);
+  if (index >= _versions.size()) {
+    _versions.resize(index + 1);
   }
 
-  return Entity(*this, index, _meta[index].create());
+  return Entity(*this, index, _versions[index].create());
 }
 
 void Container::destroy(const Entity& entity) {
@@ -25,7 +25,7 @@ void Container::destroy(const Entity& entity) {
   }
 
   _holes.push_back(entity._index);
-  _meta[entity._index].destroy();
+  _versions[entity._index].destroy();
 }
 
 void Container::copy(const Entity& source, const Entity& target) {

@@ -8,6 +8,7 @@
 #include "secs/event_manager.h"
 #include "secs/omniset.h"
 #include "secs/type_keyed_map.h"
+#include "secs/version.h"
 
 namespace secs {
 template<typename> class ComponentPtr;
@@ -48,31 +49,22 @@ public:
   }
 
 private:
-  struct Meta {
-    bool     exists  = false;
-    uint64_t version = 0;
-
-    uint64_t create() {
-      exists = true;
-      return ++version;
-    }
-
-    uint64_t destroy() {
-      exists = false;
-      return ++version;
-    }
-  };
-
   size_t capacity() const {
     return _capacity;
   }
 
-  uint64_t get_version(size_t index) const {
-    return index < _meta.size() ? _meta[index].version : 0;
+  Version get_version(size_t index) const {
+    return index < _versions.size() ? _versions[index] : Version{};
   }
 
   bool contains(size_t index) const {
-    return index < _meta.size() && _meta[index].exists;
+    return index < _versions.size() && _versions[index].exists();
+  }
+
+  bool contains(size_t index, Version version) const {
+    return index < _versions.size()
+        && _versions[index].exists()
+        && _versions[index] == version;
   }
 
   template<typename T>
@@ -92,7 +84,7 @@ private:
 
   size_t                      _capacity = 0;
   std::vector<size_t>         _holes;
-  std::vector<Meta>           _meta;
+  std::vector<Version>        _versions;
 
   Omniset                     _stores;
   TypeKeyedMap<ComponentOps>  _ops;

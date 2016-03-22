@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <utility>
 
+#include "secs/version.h"
+
 namespace secs {
 
 template<typename> class ComponentPtr;
@@ -15,7 +17,6 @@ public:
   Entity()
     : _container(nullptr)
     , _index(0)
-    , _version(0)
   {}
 
   explicit operator bool () const;
@@ -51,7 +52,7 @@ public:
   void destroy() const;
 
 private:
-  Entity(Container& container, size_t index, uint64_t version)
+  Entity(Container& container, size_t index, Version version)
     : _container(&container)
     , _index(index)
     , _version(version)
@@ -60,7 +61,7 @@ private:
 private:
   Container* _container;
   size_t     _index;
-  uint64_t   _version;
+  Version    _version;
 
   friend class Container;
   friend bool operator == (const Entity&, const Entity&);

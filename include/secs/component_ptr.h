@@ -12,14 +12,13 @@ public:
   ComponentPtr()
     : _store(nullptr)
     , _index(0)
-    , _version(0)
   {}
 
   ComponentPtr(std::nullptr_t) : ComponentPtr()
   {}
 
   explicit operator bool () const {
-    return _store && _version > 0 && _store->contains(_index, _version);
+    return _store && _store->contains(_index, _version);
   }
 
   T& operator * () const {
@@ -37,7 +36,7 @@ public:
   }
 
 private:
-  ComponentPtr(ComponentStore<T>& store, size_t index, uint64_t version)
+  ComponentPtr(ComponentStore<T>& store, size_t index, Version version)
     : _store(&store)
     , _index(index)
     , _version(version)
@@ -46,7 +45,7 @@ private:
 private:
   ComponentStore<T>* _store;
   size_t             _index;
-  uint64_t           _version;
+  Version            _version;
 
   template<typename U>
   friend bool operator == (const ComponentPtr<U>&, const ComponentPtr<U>&);
