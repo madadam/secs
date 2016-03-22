@@ -5,7 +5,7 @@
 
 #include "secs/component_ops.h"
 #include "secs/component_store.h"
-#include "secs/event.h"
+#include "secs/event_manager.h"
 #include "secs/omniset.h"
 #include "secs/type_keyed_map.h"
 
@@ -35,8 +35,8 @@ public:
 
   Entity get(size_t index);
 
-  template<typename T> void subscribe  (LifetimeSubscriber<T>& subscriber);
-  template<typename T> void unsubscribe(LifetimeSubscriber<T>& subscriber);
+  template<typename T> void subscribe  (LifetimeSubscriber<T>&);
+  template<typename T> void unsubscribe(LifetimeSubscriber<T>&);
 
 private:
   struct Meta {
@@ -78,9 +78,6 @@ private:
   void destroy_component(const Entity&);
 
   void copy(const Entity& source, const Entity& target);
-  void move(const Entity& source, const Entity& target);
-
-  void cleanup(size_t index);
 
 private:
 
@@ -95,36 +92,6 @@ private:
   friend class Entity;
   template<typename, typename, typename> friend class EntityView;
 };
-
-template<typename, typename...> struct InvokeOnCreate;
-
-template<typename T>
-void invoke_on_create(const Entity& entity, const ComponentPtr<T>&);
-
-template<typename T>
-void invoke_on_copy( const Entity& source
-                   , const Entity& target
-                   , const ComponentPtr<T>&);
-
-template<typename T>
-void invoke_on_move( const Entity& source
-                   , const Entity& target
-                   , const ComponentPtr<T>&);
-
-template<typename T>
-void invoke_on_destroy(const Entity&, const ComponentPtr<T>&);
-
-template<typename T> void on_create(const Entity&, const ComponentPtr<T>&);
-
-template<typename T> void on_copy( const Entity&
-                                 , const Entity&
-                                 , const ComponentPtr<T>&);
-
-template<typename T> void on_move( const Entity&
-                                 , const Entity&
-                                 , const ComponentPtr<T>&);
-
-template<typename T> void on_destroy(const Entity&, const ComponentPtr<T>&);
 
 } // namespace secs
 

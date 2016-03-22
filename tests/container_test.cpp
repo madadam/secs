@@ -23,20 +23,6 @@ public:
   std::string name;
 };
 
-class PositionSubscriber : public LifetimeSubscriber<Position> {
-public:
-  int creates = 0;
-  int destroys = 0;
-
-  void on_create(Entity, ComponentPtr<Position>) override {
-    ++creates;
-  }
-
-  void on_destroy(Entity, ComponentPtr<Position>) override {
-    ++destroys;
-  }
-};
-
 template<typename T>
 void unused(T) {}
 
@@ -101,28 +87,6 @@ TEST_CASE("Copy entity") {
     CHECK(e1.component<Position>()->x == 123);
     CHECK(e1.component<Position>()->y == 456);
   }
-}
-
-TEST_CASE("Move Entity") {
-  Container container0;
-  Container container1;
-  auto e0 = container0.create();
-  e0.create_component<Position>(123, 456);
-
-  CHECK(container0.size() == 1);
-  CHECK(container1.size() == 0);
-
-  auto e1 = e0.move_to(container1);
-
-  CHECK(e1 != e0);
-  CHECK(!e0);
-
-  CHECK(container0.size() == 0);
-  CHECK(container1.size() == 1);
-
-  CHECK(e1.component<Position>());
-  CHECK(e1.component<Position>()->x == 123);
-  CHECK(e1.component<Position>()->y == 456);
 }
 
 TEST_CASE("Iterate over Entities") {
@@ -229,8 +193,8 @@ TEST_CASE("Copy Component in the same Container") {
   auto e0 = container.create();
   auto e1 = container.create();
 
-  e0.create_component<Position>(123, 456);
-  e1.copy_component_from<Position>(e0);
+  auto c0 = e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(*c0);
 
   auto i0 = e0.component<Position>();
   auto i1 = e1.component<Position>();
@@ -248,8 +212,8 @@ TEST_CASE("Copy Component between different Containers") {
   auto e0 = container0.create();
   auto e1 = container1.create();
 
-  e0.create_component<Position>(123, 456);
-  e1.copy_component_from<Position>(e0);
+  auto c0 = e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(*c0);
 
   auto i0 = e0.component<Position>();
   auto i1 = e1.component<Position>();
@@ -265,8 +229,8 @@ TEST_CASE("Move Component in the same Container") {
   auto e0 = container.create();
   auto e1 = container.create();
 
-  e0.create_component<Position>(123, 456);
-  e1.move_component_from<Position>(e0);
+  auto c0 = e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(std::move(*c0));
 
   auto i1 = e1.component<Position>();
   CHECK(i1);
@@ -281,8 +245,8 @@ TEST_CASE("Move Component between different Containers") {
   auto e0 = container0.create();
   auto e1 = container1.create();
 
-  e0.create_component<Position>(123, 456);
-  e1.move_component_from<Position>(e0);
+  auto c0 = e0.create_component<Position>(123, 456);
+  e1.create_component<Position>(std::move(*c0));
 
   auto i1 = e1.component<Position>();
   CHECK(i1);
@@ -315,7 +279,7 @@ TEST_CASE("Moving Component invokes its move constructor") {
   auto c0 = e0.create_component<MovableComponent>();
   CHECK(!c0->moved);
 
-  auto c1 = e1.move_component_from<MovableComponent>(e0);
+  auto c1 = e1.create_component<MovableComponent>(std::move(*c0));
   CHECK(c1->moved);
 }
 
@@ -362,105 +326,36 @@ TEST_CASE("ComponentView") {
   CHECK(&cs1.get<Velocity>() == c1.get());
 }
 
+////////////////////////////////////////////////////////////////////////////////
+template<typename T>
+struct TestLifetimeSubscriber : public LifetimeSubscriber<T> {
+  size_t created   = 0;
+  size_t destroyed = 0;
+
+  void on_create(const Entity&, const ComponentPtr<T>&) override {
+    ++created;
+  }
+
+  void on_destroy(const Entity&, const ComponentPtr<T>&) override {
+    ++destroyed;
+  }
+};
+
 TEST_CASE("Lifetime events") {
   Container container;
-  PositionSubscriber subscriber;
+  TestLifetimeSubscriber<Position> subscriber;
 
   container.subscribe<Position>(subscriber);
 
-  CHECK(subscriber.creates  == 0);
-  CHECK(subscriber.destroys == 0);
+  CHECK(subscriber.created   == 0);
+  CHECK(subscriber.destroyed == 0);
 
-  auto e0 = container.create();
-  CHECK(subscriber.creates  == 0);
-  CHECK(subscriber.destroys == 0);
+  auto e = container.create();
+  e.create_component<Position>(123, 456);
+  CHECK(subscriber.created   == 1);
+  CHECK(subscriber.destroyed == 0);
 
-  e0.create_component<Position>();
-  CHECK(subscriber.creates  == 1);
-  CHECK(subscriber.destroys == 0);
-
-  auto e1 = e0.copy();
-  CHECK(subscriber.creates  == 2);
-  CHECK(subscriber.destroys == 0);
-
-  e1.destroy_component<Position>();
-  CHECK(subscriber.creates  == 2);
-  CHECK(subscriber.destroys == 1);
-
-  e0.destroy();
-  CHECK(subscriber.creates  == 2);
-  CHECK(subscriber.destroys == 2);
-}
-
-TEST_CASE("Lifetime events on move") {
-  Container container0;
-  PositionSubscriber subscriber0;
-  container0.subscribe<Position>(subscriber0);
-
-  Container container1;
-  PositionSubscriber subscriber1;
-  container1.subscribe<Position>(subscriber1);
-
-  auto e0 = container0.create();
-  e0.create_component<Position>();
-  CHECK(subscriber0.creates  == 1);
-  CHECK(subscriber0.destroys == 0);
-  CHECK(subscriber1.creates  == 0);
-  CHECK(subscriber1.destroys == 0);
-
-  e0.move_to(container1);
-  CHECK(subscriber0.creates  == 1);
-  CHECK(subscriber0.destroys == 1);
-  CHECK(subscriber1.creates  == 1);
-  CHECK(subscriber1.destroys == 0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-struct ComponentWithCallbacks {
-  bool created = false;
-  bool copied  = false;
-  bool moved   = false;
-
-  std::function<void()> destroyed;
-};
-
-void on_create(Entity, ComponentPtr<ComponentWithCallbacks> c) {
-  c->created = true;
-}
-
-void on_copy(Entity, Entity, ComponentPtr<ComponentWithCallbacks> c) {
-  c->copied = true;
-}
-
-void on_move(Entity, Entity, ComponentPtr<ComponentWithCallbacks> c) {
-  c->moved = true;
-}
-
-void on_destroy(Entity, ComponentPtr<ComponentWithCallbacks> c) {
-  if (c->destroyed) c->destroyed();
-}
-
-TEST_CASE("Lifetime callbacks") {
-  Container container;
-  auto e0 = container.create();
-
-  auto c0 = e0.create_component<ComponentWithCallbacks>();
-  CHECK(c0->created);
-
-  auto e1 = e0.copy();
-  auto c1 = e1.component<ComponentWithCallbacks>();
-  CHECK(c1->copied);
-
-  auto e2 = container.create();
-  auto c2 = e2.move_component_from<ComponentWithCallbacks>(e0);
-  CHECK(c2->moved);
-
-  auto e3 = container.create();
-  auto c3 = e3.create_component<ComponentWithCallbacks>();
-
-  bool destroyed = false;
-  c3->destroyed = [&]() { destroyed = true; };
-
-  e3.destroy_component<ComponentWithCallbacks>();
-  CHECK(destroyed);
+  e.destroy();
+  CHECK(subscriber.created   == 1);
+  CHECK(subscriber.destroyed == 1);
 }

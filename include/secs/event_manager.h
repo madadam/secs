@@ -6,6 +6,30 @@
 namespace secs {
 
 template<typename> class Publisher;
+template<typename> class Subscriber;
+
+class EventManager {
+public:
+
+  template<typename E>
+  void subscribe(Subscriber<E>& subscriber) {
+    _publishers.get<Publisher<E>>().subscribe(subscriber);
+  }
+
+  template<typename E>
+  void unsubscribe(Subscriber<E>& subscriber) {
+    _publishers.get<Publisher<E>>().unsubscribe(subscriber);
+  }
+
+  template<typename E>
+  void emit(const E& event) const {
+    _publishers.get<Publisher<E>>().emit(event);
+  }
+
+private:
+
+  Omniset _publishers;
+};
 
 template<typename E>
 class Subscriber {
@@ -66,7 +90,7 @@ public:
     return *this;
   }
 
-  virtual void receive(E) {}
+  virtual void receive(const E&) {}
 
 private:
 
@@ -137,7 +161,7 @@ public:
     subscriber._publisher = nullptr;
   }
 
-  void emit(E event) const {
+  void emit(const E& event) const {
     for (auto subscriber : _subscribers) {
       subscriber->receive(event);
     }
@@ -149,29 +173,6 @@ private:
   std::vector<size_t>         _holes;
 
   friend class Subscriber<E>;
-};
-
-class EventManager {
-public:
-
-  template<typename E>
-  void subscribe(Subscriber<E>& subscriber) {
-    _publishers.get<Publisher<E>>().subscribe(subscriber);
-  }
-
-  template<typename E>
-  void unsubscribe(Subscriber<E>& subscriber) {
-    _publishers.get<Publisher<E>>().unsubscribe(subscriber);
-  }
-
-  template<typename E>
-  void emit(E event) const {
-    _publishers.get<Publisher<E>>().emit(event);
-  }
-
-private:
-
-  Omniset _publishers;
 };
 
 } // namespace secs

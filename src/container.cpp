@@ -24,7 +24,8 @@ void Container::destroy(const Entity& entity) {
     ops.destroy(entity);
   }
 
-  cleanup(entity._index);
+  _holes.push_back(entity._index);
+  _meta[entity._index].destroy();
 }
 
 void Container::copy(const Entity& source, const Entity& target) {
@@ -33,19 +34,4 @@ void Container::copy(const Entity& source, const Entity& target) {
   for (auto& ops : _ops) {
     ops.copy(source, target);
   }
-}
-
-void Container::move(const Entity& source, const Entity& target) {
-  assert(source._container == this);
-
-  for (auto& ops : _ops) {
-    ops.move(source, target);
-  }
-
-  cleanup(source._index);
-}
-
-void Container::cleanup(size_t index) {
-  _holes.push_back(index);
-  _meta[index].destroy();
 }

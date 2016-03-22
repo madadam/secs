@@ -1,40 +1,39 @@
 #pragma once
 
 #include "secs/component_ptr.h"
-#include "secs/event.h"
+#include "secs/entity.h"
+#include "secs/event_manager.h"
 
 namespace secs {
 
-class Entity;
-
 template<typename T>
-struct OnCreate {
-  const Entity          entity    = nullptr;
-  const ComponentPtr<T> component = nullptr;
+struct CreateEvent {
+  Entity          entity;
+  ComponentPtr<T> component;
 };
 
 template<typename T>
-struct OnDestroy {
-  const Entity          entity    = nullptr;
-  const ComponentPtr<T> component = nullptr;
+struct DestroyEvent {
+  Entity          entity;
+  ComponentPtr<T> component;
 };
 
 template<typename T>
-class LifetimeSubscriber : public Subscriber<OnCreate<T>>
-                         , public Subscriber<OnDestroy<T>>
+class LifetimeSubscriber : public Subscriber<CreateEvent<T>>
+                         , public Subscriber<DestroyEvent<T>>
 {
 public:
 
-  virtual void on_create (Entity, ComponentPtr<T>) {};
-  virtual void on_destroy(Entity, ComponentPtr<T>) {};
+  virtual void on_create (const Entity&, const ComponentPtr<T>&) {}
+  virtual void on_destroy(const Entity&, const ComponentPtr<T>&) {}
 
-  void receive(OnCreate<T>  event) override {
-    on_create (event.entity, event.component);
+  void receive(const CreateEvent<T>& event) {
+    on_create(event.entity, event.component);
   }
 
-  void receive(OnDestroy<T> event) override {
+  void receive(const DestroyEvent<T>& event) {
     on_destroy(event.entity, event.component);
   }
 };
 
-} // namespace secs
+}

@@ -19,17 +19,6 @@ Entity Entity::copy_to(Container& target) const {
   return result;
 }
 
-Entity Entity::move_to(Container& target) {
-  assert(*this);
-
-  // Moving within the same container has no observable effect.
-  if (_container == &target) return *this;
-
-  auto result = target.create();
-  _container->move(*this, result);
-  return result;
-}
-
 void Entity::destroy() const {
   assert(*this);
   _container->destroy(*this);
