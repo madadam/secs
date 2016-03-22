@@ -35,11 +35,11 @@ public:
 private:
 
   template<typename T> static
-  typename std::enable_if<std::is_copy_constructible<T>::value, void>::type
+  std::enable_if_t<std::is_copy_constructible<T>::value, void>
   copy(const Entity&, const Entity&);
 
   template<typename T> static
-  typename std::enable_if<!std::is_copy_constructible<T>::value, void>::type
+  std::enable_if_t<!std::is_copy_constructible<T>::value, void>
   copy(const Entity&, const Entity&);
 
   template<typename T> static void destroy(const Entity&);

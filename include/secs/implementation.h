@@ -5,7 +5,7 @@
 #include "secs/container.h"
 #include "secs/entity.h"
 #include "secs/entity_view.h"
-#include "secs/lifetime_subscriber.h"
+#include "secs/lifetime_events.h"
 
 namespace secs {
 
@@ -48,21 +48,9 @@ void Container::destroy_component(const Entity& entity) {
 }
 
 
-template<typename T>
-void Container::subscribe(LifetimeSubscriber<T>& subscriber) {
-  _event_manager.subscribe<CreateEvent<T>>(subscriber);
-  _event_manager.subscribe<DestroyEvent<T>>(subscriber);
-}
-
-template<typename T>
-void Container::unsubscribe(LifetimeSubscriber<T>& subscriber) {
-  _event_manager.unsubscribe<CreateEvent<T>>(subscriber);
-  _event_manager.unsubscribe<DestroyEvent<T>>(subscriber);
-}
-
 // ComponentOps implementation
 template<typename T>
-typename std::enable_if<std::is_copy_constructible<T>::value, void>::type
+std::enable_if_t<std::is_copy_constructible<T>::value, void>
 ComponentOps::copy(const Entity& source, const Entity& target) {
   if (auto sc = source.component<T>().get()) {
     target.create_component<T>(*sc);
@@ -70,7 +58,7 @@ ComponentOps::copy(const Entity& source, const Entity& target) {
 }
 
 template<typename T>
-typename std::enable_if<!std::is_copy_constructible<T>::value, void>::type
+std::enable_if_t<!std::is_copy_constructible<T>::value, void>
 ComponentOps::copy(const Entity& source, const Entity&) {
   assert(!source.component<T>());
 }

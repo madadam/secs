@@ -13,7 +13,7 @@ namespace secs {
 template<typename> class ComponentPtr;
 class Entity;
 template<typename, typename, typename> class EntityView;
-template<typename> class LifetimeSubscriber;
+template<typename> class Subscriber;
 
 class Container {
 public:
@@ -35,8 +35,17 @@ public:
 
   Entity get(size_t index);
 
-  template<typename T> void subscribe  (LifetimeSubscriber<T>&);
-  template<typename T> void unsubscribe(LifetimeSubscriber<T>&);
+  template<typename E> void subscribe(Subscriber<E>& subscriber) {
+    _event_manager.subscribe<E>(subscriber);
+  }
+
+  template<typename E> void unsubscribe(Subscriber<E>& subscriber) {
+    _event_manager.unsubscribe<E>(subscriber);
+  }
+
+  template<typename E> void emit(const E& event) {
+    _event_manager.emit(event);
+  }
 
 private:
   struct Meta {

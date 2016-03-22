@@ -20,7 +20,7 @@ namespace detail {
   }
 
   template<typename T>
-  typename std::enable_if<!std::is_trivially_copyable<T>::value, void>::type
+  std::enable_if_t<!std::is_trivially_copyable<T>::value, void>
   move( Store<T>*                    dst
       , Store<T>*                    src
       , size_t                       count
@@ -36,7 +36,7 @@ namespace detail {
   // If T is trivially copyable, we can move the memory much faster using
   // memcpy.
   template<typename T>
-  typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type
+  std::enable_if_t<std::is_trivially_copyable<T>::value, void>
   move(Store<T>* dst, Store<T>* src, size_t count, const std::vector<uint64_t>&) {
     std::memcpy( reinterpret_cast<void*>(dst)
                , reinterpret_cast<void*>(src)

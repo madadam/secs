@@ -328,24 +328,27 @@ TEST_CASE("ComponentView") {
 
 ////////////////////////////////////////////////////////////////////////////////
 template<typename T>
-struct TestLifetimeSubscriber : public LifetimeSubscriber<T> {
+struct TestSubscriber : public Subscriber<CreateEvent<T>>
+                      , public Subscriber<DestroyEvent<T>>
+{
   size_t created   = 0;
   size_t destroyed = 0;
 
-  void on_create(const Entity&, const ComponentPtr<T>&) override {
+  void receive(const CreateEvent<T>&) override {
     ++created;
   }
 
-  void on_destroy(const Entity&, const ComponentPtr<T>&) override {
+  void receive(const DestroyEvent<T>&) override {
     ++destroyed;
   }
 };
 
 TEST_CASE("Lifetime events") {
   Container container;
-  TestLifetimeSubscriber<Position> subscriber;
+  TestSubscriber<Position> subscriber;
 
-  container.subscribe<Position>(subscriber);
+  container.subscribe<CreateEvent<Position>>(subscriber);
+  container.subscribe<DestroyEvent<Position>>(subscriber);
 
   CHECK(subscriber.created   == 0);
   CHECK(subscriber.destroyed == 0);

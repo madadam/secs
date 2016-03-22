@@ -175,14 +175,14 @@ public:
     }
 
     template<typename T>
-    typename std::enable_if<!std::is_pointer<T>::value, T&>::type
+    std::enable_if_t<!std::is_pointer<T>::value, T&>
     get() const {
       static_assert(detail::Contains<Need, T>, "T is not among needed Component types");
       return std::get<T&>(_need);
     }
 
     template<typename T>
-    typename std::enable_if<std::is_pointer<T>::value, T>::type
+    std::enable_if_t<std::is_pointer<T>::value, T>
     get() const {
       static_assert( detail::Contains<Load, typename std::remove_pointer<T>::type>
                    , "T is not among loaded Component types");

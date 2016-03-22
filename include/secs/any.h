@@ -14,8 +14,8 @@ namespace secs {
 class Any {
 private:
   template<typename T, typename R = void>
-  using disable_if_self = typename std::enable_if<
-    !std::is_same<typename std::decay<T>::type, Any>::value, R>::type;
+  using disable_if_self = std::enable_if_t<
+    !std::is_same<typename std::decay<T>::type, Any>::value, R>;
 
   template<typename T>
   static void destroy(void* store) {
