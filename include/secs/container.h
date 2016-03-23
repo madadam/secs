@@ -18,9 +18,11 @@ template<typename> class Subscriber;
 
 class Container {
 public:
+  ~Container();
 
   // Create new Entity.
   Entity create();
+
   // Destroy Entity.
   void destroy(const Entity& entity);
 
@@ -78,6 +80,12 @@ private:
   template<typename T>
   void destroy_component(const Entity&);
 
+  template<typename T>
+  ComponentPtr<T> create_component_unless_exists();
+
+  template<typename T>
+  void destroy_component_if_exists();
+
   void copy(const Entity& source, const Entity& target);
 
 private:
@@ -86,9 +94,9 @@ private:
   std::vector<size_t>         _holes;
   std::vector<Version>        _versions;
 
+  EventManager                _event_manager;
   Omniset                     _stores;
   TypeKeyedMap<ComponentOps>  _ops;
-  EventManager                _event_manager;
 
   friend class Entity;
   template<typename, typename, typename> friend class EntityView;

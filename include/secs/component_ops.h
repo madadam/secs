@@ -6,7 +6,6 @@ class Entity;
 
 class ComponentOps {
 public:
-
   ComponentOps()
     : _copy(&copy_noop)
     , _destroy(&destroy_noop)

@@ -2,6 +2,12 @@
 
 using namespace secs;
 
+Container::~Container() {
+  for (auto c : entities()) {
+    destroy(c.entity());
+  }
+}
+
 Entity Container::create() {
   size_t index;
 
@@ -16,7 +22,9 @@ Entity Container::create() {
     _versions.resize(index + 1);
   }
 
-  return Entity(*this, index, _versions[index].create());
+  _versions[index].create();
+
+  return Entity(*this, index, _versions[index]);
 }
 
 void Container::destroy(const Entity& entity) {

@@ -31,8 +31,8 @@ public:
   template<typename T, typename... Args>
   ComponentPtr<T> create_component(Args&&... args) const;
 
-  // Create a Component of the given type unless one already exists.
-  template<typename T> ComponentPtr<T> ensure_component() const {
+  // Creates a Component of the given type unless one already exists.
+  template<typename T> ComponentPtr<T> create_component_unless_exists() const {
     if (auto p = component<T>()) {
       return p;
     } else {
@@ -42,6 +42,11 @@ public:
 
   // Destroys the Component of the given type.
   template<typename T> void destroy_component() const;
+
+  // Destroys the Component of the given type if it exists.
+  template<typename T> void destroy_component_if_exists() const {
+    if (component<T>()) destroy_component<T>();
+  }
 
   Container& container() const {
     return *_container;

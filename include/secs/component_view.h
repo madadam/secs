@@ -30,7 +30,6 @@ class ComponentView {
 public:
   ComponentView()
     : _index(0)
-    , _version(0)
   {}
 
   explicit ComponentView(ComponentPtr<Ts>... ptrs)

@@ -6,15 +6,25 @@
 namespace secs {
 
 template<typename T>
-struct CreateEvent {
+struct BeforeCreate {
+  const Entity entity;
+};
+
+template<typename T>
+struct AfterCreate {
   const Entity          entity;
   const ComponentPtr<T> component;
 };
 
 template<typename T>
-struct DestroyEvent {
+struct BeforeDestroy {
   const Entity          entity;
   const ComponentPtr<T> component;
+};
+
+template<typename T>
+struct AfterDestroy {
+  const Entity entity;
 };
 
 }

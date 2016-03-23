@@ -4,46 +4,36 @@ namespace secs {
 
 struct Version {
 public:
-  Version()
-    : whole(0)
-  {}
-
   bool exists() const {
-    return parts.exists;
+    return _value & 1;
   }
 
   uint32_t serial() const {
-    return parts.serial;
+    return _value >> 1;
   }
 
-  Version create() {
-    parts.exists = true;
-    ++parts.serial;
-    return *this;
+  void create() {
+    assert(!exists());
+    _value = (((_value >> 1) + 1) << 1) | 1;
   }
 
-  Version destroy() {
-    parts.exists = false;
-    ++parts.serial;
-    return *this;
+  void destroy() {
+    assert(exists());
+    _value = ((_value >> 1) + 1) << 1;
   }
 
 private:
-  union {
-    struct {
-      uint32_t serial : 31;
-      bool     exists : 1;
-    } parts;
-
-    uint32_t whole;
-  };
+  uint32_t _value = 0;
 
   friend bool operator == (Version, Version);
+  friend bool operator != (Version, Version);
   friend bool operator <  (Version, Version);
+  friend bool operator >  (Version, Version);
 };
 
-inline bool operator == (Version a, Version b) { return a.whole == b.whole; }
-inline bool operator != (Version a, Version b) { return !(a == b); }
-inline bool operator <  (Version a, Version b) { return a.whole < b.whole; }
+inline bool operator == (Version a, Version b) { return a._value == b._value; }
+inline bool operator != (Version a, Version b) { return a._value != b._value; }
+inline bool operator <  (Version a, Version b) { return a._value <  b._value; }
+inline bool operator >  (Version a, Version b) { return a._value >  b._value; }
 
 } // namespace secs

@@ -25,12 +25,13 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   auto& s = store<T>();
   assert(!s.contains(entity._index));
 
+  _event_manager.emit(BeforeCreate<T>{ entity });
+
   _ops.get<T>().template setup<T>();
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
 
   ComponentPtr<T> component(s, entity._index, entity._version);
-  CreateEvent<T> event{ entity, component };
-  _event_manager.emit(event);
+  _event_manager.emit(AfterCreate<T>{ entity, component });
 
   return component;
 }
@@ -41,10 +42,11 @@ void Container::destroy_component(const Entity& entity) {
   assert(s.contains(entity._index, entity._version));
 
   ComponentPtr<T> component(s, entity._index, entity._version);
-  DestroyEvent<T> event{ entity, component };
-  _event_manager.emit(event);
+  _event_manager.emit(BeforeDestroy<T>{ entity, component });
 
   s.erase(entity._index);
+
+  _event_manager.emit(AfterDestroy<T>{ entity });
 }
 
 

@@ -163,7 +163,7 @@ public:
 
   void emit(const E& event) const {
     for (auto subscriber : _subscribers) {
-      subscriber->receive(event);
+      if (subscriber) subscriber->receive(event);
     }
   }
 

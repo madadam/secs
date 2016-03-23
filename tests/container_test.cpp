@@ -182,8 +182,8 @@ TEST_CASE("Create Components") {
   e.create_component<Position>();
   CHECK(e.component<Position>());
 
-  auto c0 = e.ensure_component<Velocity>();
-  auto c1 = e.ensure_component<Velocity>();
+  auto c0 = e.create_component_unless_exists<Velocity>();
+  auto c1 = e.create_component_unless_exists<Velocity>();
   CHECK(c0 == c1);
 }
 
@@ -328,17 +328,17 @@ TEST_CASE("ComponentView") {
 
 ////////////////////////////////////////////////////////////////////////////////
 template<typename T>
-struct TestSubscriber : public Subscriber<CreateEvent<T>>
-                      , public Subscriber<DestroyEvent<T>>
+struct TestSubscriber : public Subscriber<AfterCreate<T>>
+                      , public Subscriber<AfterDestroy<T>>
 {
   size_t created   = 0;
   size_t destroyed = 0;
 
-  void receive(const CreateEvent<T>&) override {
+  void receive(const AfterCreate<T>&) override {
     ++created;
   }
 
-  void receive(const DestroyEvent<T>&) override {
+  void receive(const AfterDestroy<T>&) override {
     ++destroyed;
   }
 };
@@ -347,8 +347,8 @@ TEST_CASE("Lifetime events") {
   Container container;
   TestSubscriber<Position> subscriber;
 
-  container.subscribe<CreateEvent<Position>>(subscriber);
-  container.subscribe<DestroyEvent<Position>>(subscriber);
+  container.subscribe<AfterCreate<Position>>(subscriber);
+  container.subscribe<AfterDestroy<Position>>(subscriber);
 
   CHECK(subscriber.created   == 0);
   CHECK(subscriber.destroyed == 0);
