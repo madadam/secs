@@ -53,7 +53,7 @@ private:
   template<typename U>
   friend bool operator < (const ComponentPtr<U>&, const ComponentPtr<U>&);
 
-  template<typename...> friend class ComponentView;
+  template<typename...> friend class ComponentSet;
   friend class Container;
   friend class Entity;
 };

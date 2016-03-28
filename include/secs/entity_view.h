@@ -2,222 +2,66 @@
 
 #include <tuple>
 #include "secs/container.h"
+#include "secs/component_set.h"
 #include "secs/detail.h"
 
 namespace secs {
-
 namespace detail {
-
-// Convert tuple<T...> to tuple<ComponentStore<T>&...>
-namespace help {
 template<typename... Ts>
-struct ComponentStoreRefs;
+using ComponentStores = std::tuple<ComponentStore<Ts>*...>;
 
+template<typename S>
+using Iterator = decltype(std::begin(std::declval<S>()));
+
+template<typename Source, typename... Us>
+using Load = decltype(std::declval<Source>().template load<Us...>());
+
+}
+
+template<typename, typename...> class NeedEntityView;
+template<typename, typename...> class SkipEntityView;
+
+////////////////////////////////////////////////////////////////////////////////
+// View of all Entities in a Container.
 template<typename... Ts>
-struct ComponentStoreRefs<std::tuple<Ts...>> {
-  using type = std::tuple<ComponentStore<Ts>&...>;
-};
-}
-
-template<typename T>
-using ComponentStoreRefs = typename help::ComponentStoreRefs<T>::type;
-
-
-// Convert tuple<T...> to tuple<T&...>
-namespace help {
-template<typename... Ts>
-struct ToRefs;
-
-template<typename... Ts>
-struct ToRefs<std::tuple<Ts...>> {
-  using type = std::tuple<typename std::add_lvalue_reference<Ts>::type...>;
-};
-}
-
-template<typename T>
-using ToRefs = typename help::ToRefs<T>::type;
-
-
-// Convert tuple<T...> to tuple<T*...>
-namespace help {
-template<typename... Ts>
-struct ToPtrs;
-
-template<typename... Ts>
-struct ToPtrs<std::tuple<Ts...>> {
-  using type = std::tuple<typename std::add_pointer<Ts>::type...>;
-};
-}
-
-template<typename T>
-using ToPtrs = typename help::ToPtrs<T>::type;
-
-
-// Test if all stores have component at the given index.
-template<typename T>
-bool has_all(const ComponentStoreRefs<T>& stores, size_t index) {
-  return all(stores, [=](auto& store) {
-    return store.contains(index);
-  });
-}
-
-// Test if no store has component at the given index.
-template<typename T>
-bool has_none(const ComponentStoreRefs<T>& stores, size_t index) {
-  return all(stores, [=](auto& store) {
-    return !store.contains(index);
-  });
-}
-
-// Get tuple of references to index-th components, one from each store in the
-// given store tuple.
-namespace help {
-template<typename T>
-struct GetRefs;
-
-template<typename... Ts>
-struct GetRefs<std::tuple<Ts...>> {
-  auto operator () ( const detail::ComponentStoreRefs<std::tuple<Ts...>>& stores
-                   , size_t index) const
-  {
-    (void) index; // supress unused warning
-    return std::tie(std::get<ComponentStore<Ts>&>(stores).get(index)...);
-  }
-};
-}
-
-template<typename T>
-auto get_refs(const ComponentStoreRefs<T>& stores, size_t index) {
-  return help::GetRefs<T>()(stores, index);
-}
-
-
-// Get pointer to component from the store, or nullptr it there is no component.
-template<typename T>
-T* get_ptr(ComponentStore<T>& store, size_t index) {
-  return store.contains(index) ? &store.get(index) : nullptr;
-}
-
-
-// Get tuple of pointers to index-th components, one from each store in the
-// given store tuple. If a store does not have component at index-th position,
-// nullptr is returned in its place.
-namespace help {
-template<typename T>
-struct GetPtrs;
-
-template<typename... Ts>
-struct GetPtrs<std::tuple<Ts...>> {
-  auto operator () ( const detail::ComponentStoreRefs<std::tuple<Ts...>>& stores
-                   , size_t index) const
-  {
-    (void) index; // supress unused warning
-    return std::make_tuple(get_ptr( std::get<ComponentStore<Ts>&>(stores)
-                                  , index)...);
-  }
-};
-}
-
-template<typename T>
-auto get_ptrs(const ComponentStoreRefs<T>& stores, size_t index) {
-  return help::GetPtrs<T>()(stores, index);
-}
-
-
-// Call set.slice, but use the types from the tuple T
-namespace help {
-template<typename T>
-struct Slice;
-
-template<typename... Ts>
-struct Slice<std::tuple<Ts...>> {
-  auto operator () (const Omniset& set) const {
-    return set.slice<ComponentStore<Ts>...>();
-  }
-};
-}
-
-template<typename T>
-auto slice(const Omniset& set) {
-  return help::Slice<T>()(set);
-}
-
-
-// Call entity.components, but use the types from the tuple T
-namespace help {
-template<typename T>
-struct Components;
-
-template<typename... Ts>
-struct Components<std::tuple<Ts...>> {
-  auto operator () (const Entity& entity) const {
-    return entity.components<Ts...>();
-  }
-};
-}
-
-template<typename T>
-auto components(const Entity& entity) {
-  return help::Components<T>()(entity);
-}
-
-} // namespace detail
-
-// Base EntityView
-template<typename Need, typename Skip, typename Load>
-class EntityView {
+class ContainerEntityView {
 public:
   class Iterator;
 
-  class Cursor {
+  class Enumerator {
   public:
     const Entity& entity() const {
       return _entity;
     }
 
     template<typename T>
-    std::enable_if_t<!std::is_pointer<T>::value, T&>
-    get() const {
-      static_assert(detail::Contains<Need, T>, "T is not among needed Component types");
-      return std::get<T&>(_need);
+    decltype(auto) get() const {
+      return _components.get<T>();
     }
 
-    template<typename T>
-    std::enable_if_t<std::is_pointer<T>::value, T>
-    get() const {
-      static_assert( detail::Contains<Load, typename std::remove_pointer<T>::type>
-                   , "T is not among loaded Component types");
-      return std::get<T>(_load);
-    }
-
-    auto all() const {
-      return detail::components<Need>(_entity);
+    const ComponentSet<Ts...>& all() const {
+      return _components;
     }
 
   private:
-    Cursor( Entity                      entity
-          , const detail::ToRefs<Need>& need
-          , const detail::ToPtrs<Load>& load)
+    Enumerator(const Entity& entity, const detail::ComponentStores<Ts...>& stores)
       : _entity(entity)
-      , _need(need)
-      , _load(load)
+      , _components(entity.components(stores))
     {}
 
   private:
-    const Entity               _entity;
-    const detail::ToRefs<Need> _need;
-    const detail::ToPtrs<Load> _load;
-
+    Entity              _entity;
+    ComponentSet<Ts...> _components;
     friend class Iterator;
   };
 
   class Iterator {
   public:
-    bool operator == (Iterator other) const {
+    bool operator == (const Iterator& other) const {
       return _index == other._index;
     }
 
-    bool operator != (Iterator other) const {
+    bool operator != (const Iterator& other) const {
       return _index != other._index;
     }
 
@@ -226,22 +70,21 @@ public:
       return *this;
     }
 
-    Cursor operator * () const {
-      return { _container.get(_index)
-             , detail::get_refs<Need>(_need, _index)
-             , detail::get_ptrs<Load>(_load, _index) };
+    Iterator& operator += (size_t distance) {
+      advance(distance);
+      return *this;
+    }
+
+    Enumerator operator * () const {
+      return { _container.get(_index), _stores };
     }
 
   private:
-    Iterator( Container&                              container
-            , const detail::ComponentStoreRefs<Need>& need
-            , const detail::ComponentStoreRefs<Skip>& skip
-            , const detail::ComponentStoreRefs<Load>& load
-            , size_t                                  index)
+    Iterator( Container&                            container
+            , const detail::ComponentStores<Ts...>& stores
+            , size_t                                index)
       : _container(container)
-      , _need(need)
-      , _skip(skip)
-      , _load(load)
+      , _stores(stores)
       , _index(index)
     {
       advance(0);
@@ -251,76 +94,296 @@ public:
       _index += offset;
 
       for (; _index < _container.capacity(); ++_index) {
-        if (  _container.contains(_index)
-           && detail::has_all <Need>(_need, _index)
-           && detail::has_none<Skip>(_skip, _index))
-        {
-          return;
-        }
+        if (_container.contains(_index)) return;
       }
 
       _index = _container.capacity();
     }
 
   private:
-    Container&                       _container;
-    detail::ComponentStoreRefs<Need> _need;
-    detail::ComponentStoreRefs<Skip> _skip;
-    detail::ComponentStoreRefs<Load> _load;
-    size_t                           _index;
+    Container&                     _container;
+    detail::ComponentStores<Ts...> _stores;
+    size_t                         _index;
 
-    friend class EntityView;
+    friend class ContainerEntityView;
+  };
+
+  ContainerEntityView(Container& container)
+    : _container(container)
+  {}
+
+  Iterator begin() const {
+    return { _container
+           , _container.store_ptrs<Ts...>()
+           , 0 };
+  }
+
+  Iterator end() const {
+    return { _container
+           , _container.store_ptrs<Ts...>()
+           , _container.capacity() };
+  }
+
+  bool empty() { return begin() == end(); }
+  auto front() { return *begin(); }
+
+  template<typename... Us>
+  ContainerEntityView<Ts..., Us...> load() const {
+    return { _container };
+  }
+
+  template<typename... Us>
+  NeedEntityView<ContainerEntityView<Ts..., Us...>, Us...> need() const {
+    return { load<Us...>() };
+  }
+
+  template<typename... Us>
+  SkipEntityView<ContainerEntityView<Ts..., Us...>, Us...> skip() const {
+    return { load<Us...>() };
+  }
+
+private:
+  Container& _container;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// View of all Entities in a sequence of Entities (e.g. std::vector<Entity>))
+template<typename Source, typename... Ts>
+class SequenceEntityView {
+public:
+  using value_type = decltype(*std::begin(std::declval<Source>()));
+
+  static_assert(std::is_convertible<value_type, Entity>::value,
+                "Source is not a sequence of Entities");
+
+  class Iterator;
+
+  class Enumerator {
+  public:
+    const Entity& entity() const {
+      return _entity;
+    }
+
+    template<typename T>
+    decltype(auto) get() const {
+      return all().get<T>();
+    }
+
+    ComponentSet<Ts...> all() const {
+      return _entity.components<Ts...>();
+    }
+
+  private:
+    Enumerator(const Entity& entity)
+      : _entity(entity)
+    {}
+
+  private:
+    Entity _entity;
+    friend class Iterator;
+  };
+
+  class Iterator {
+  public:
+    bool operator != (const Iterator& other) const {
+      return _source != other._source;
+    }
+
+    Enumerator operator * () const {
+      return { *_source };
+    }
+
+    Iterator& operator ++ () {
+      ++_source;
+      return *this;
+    }
+
+    Iterator& operator += (size_t offset) {
+      _source += offset;
+      return *this;
+    }
+
+  private:
+    Iterator(detail::Iterator<Source> source)
+      : _source(std::move(source))
+    {}
+
+  private:
+    detail::Iterator<Source> _source;
+    friend class SequenceEntityView;
   };
 
 public:
-
-  EntityView(Container& container)
-    : _container(container)
-    , _need(detail::slice<Need>(container._stores))
-    , _skip(detail::slice<Skip>(container._stores))
-    , _load(detail::slice<Load>(container._stores))
+  SequenceEntityView(Source source)
+    : _source(source)
   {}
 
-  Iterator begin() {
-    return { _container, _need, _skip, _load, 0 };
+  Iterator begin() const {
+    return { std::begin(_source) };
   }
 
-  Iterator end() {
-    return { _container, _need, _skip, _load, _container.capacity() };
+  Iterator end() const {
+    return { std::end(_source) };
   }
 
-  bool empty() {
-    return begin() == end();
+  bool empty() { return begin() == end(); }
+  auto front() { return *begin(); }
+
+  template<typename... Us>
+  SequenceEntityView<Source, Ts..., Us...> load() const {
+    return { _source };
   }
 
-  auto front() {
-    return *begin();
+  template<typename... Us>
+  NeedEntityView<SequenceEntityView<Source, Ts..., Us...>, Us...> need() const {
+    return { load<Us...>() };
   }
 
-  // Refine this view to include only entities that contain the given Components.
-  template<typename... Ts>
-  EntityView<std::tuple<Ts...>, Skip, Load> need() const {
-    return { _container };
+  template<typename... Us>
+  SkipEntityView<SequenceEntityView<Source, Ts..., Us...>, Us...> skip() const {
+    return { load<Us...>() };
   }
 
-  // Refine this view to include only entities that do not contain any of the
-  // given Component.
-  template<typename... Ts>
-  EntityView<Need, std::tuple<Ts...>, Load> skip() const {
-    return { _container };
+private:
+  Source _source;
+};
+
+inline SequenceEntityView<const std::vector<Entity>&>
+make_entity_view(const std::vector<Entity>& entities) {
+  return { entities };
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Base class for Filtered view of Entities
+template<typename Base, typename Source>
+class FilteredEntityView {
+public:
+  class Iterator {
+  public:
+    bool operator != (const Iterator& other) const {
+      return _source != other._source;
+    }
+
+    Iterator& operator ++ () {
+      advance(1);
+      return *this;
+    }
+
+    auto operator * () const {
+      return *_source;
+    }
+
+  private:
+    Iterator(detail::Iterator<Source> source, detail::Iterator<Source> end)
+      : _source(std::move(source))
+      , _end(std::move(end))
+    {
+      advance(0);
+    }
+
+    void advance(size_t offset) {
+      _source += offset;
+
+      for (; _source != _end; ++_source) {
+        if (Base::filter(*_source)) return;
+      }
+    }
+
+  private:
+    detail::Iterator<Source> _source;
+    detail::Iterator<Source> _end;
+
+    friend class FilteredEntityView;
+  };
+
+  using value_type = decltype(*std::declval<Iterator>());
+
+public:
+  FilteredEntityView(Source source)
+    : _source(source)
+  {
+    // TODO: static assert that Source loads Ts
   }
 
-  // Preload the given components for faster access.
-  template<typename... Ts>
-  EntityView<Need, Skip, std::tuple<Ts...>> load() const {
-    return { _container };
+  Iterator begin() const {
+    return { std::begin(_source), std::end(_source) };
+  }
+
+  Iterator end() const {
+    auto e = std::end(_source);
+    return { e, e };
   }
 
 protected:
-  Container&                       _container;
-  detail::ComponentStoreRefs<Need> _need;
-  detail::ComponentStoreRefs<Skip> _skip;
-  detail::ComponentStoreRefs<Load> _load;
+  Source _source;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// View of Entities that contain the given Components
+template<typename Source, typename... Ts>
+class NeedEntityView
+  : public FilteredEntityView<NeedEntityView<Source, Ts...>, Source>
+{
+public:
+  using Base = FilteredEntityView<NeedEntityView<Source, Ts...>, Source>;
+  using Base::FilteredEntityView;
+  using value_type = typename Base::value_type;
+
+  template<typename... Us>
+  NeedEntityView<detail::Load<Source, Us...>, Ts...> load() const {
+    return { _source.load<Us...>() };
+  }
+
+  template<typename... Us>
+  NeedEntityView<detail::Load<Source, Us...>, Ts..., Us...> need() const {
+    return { _source.load<Us...>() };
+  }
+
+  template<typename... Us>
+  SkipEntityView<detail::Load<Source, Us...>, Us...> skip() const {
+    return { _source.load<Us...>() };
+  }
+
+  static bool filter(const value_type& e) {
+    return e.all().template contains_all<Ts...>();
+  }
+
+private:
+  using FilteredEntityView<NeedEntityView<Source, Ts...>, Source>::_source;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// View of Entities that do not contain the given Components
+template<typename Source, typename... Ts>
+class SkipEntityView
+  : public FilteredEntityView<SkipEntityView<Source, Ts...>, Source>
+{
+public:
+  using Base = FilteredEntityView<SkipEntityView<Source, Ts...>, Source>;
+  using Base::FilteredEntityView;
+  using value_type = typename Base::value_type;
+
+  template<typename... Us>
+  SkipEntityView<detail::Load<Source, Us...>, Ts...> load() const {
+    return { _source.load<Us...>() };
+  }
+
+  template<typename... Us>
+  NeedEntityView<detail::Load<Source, Us...>, Us...> need() const {
+    return { _source.load<Us...>() };
+  }
+
+  template<typename... Us>
+  SkipEntityView<detail::Load<Source, Us...>, Ts..., Us...> skip() const {
+    return { _source.load<Us...>() };
+  }
+
+  static bool filter(const value_type& e) {
+    return e.all().template contains_none<Ts...>();
+  }
+
+private:
+  using FilteredEntityView<SkipEntityView<Source, Ts...>, Source>::_source;
 };
 
 } // namespace secs

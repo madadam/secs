@@ -89,7 +89,7 @@ TEST_CASE("Copy entity") {
   }
 }
 
-TEST_CASE("Iterate over Entities") {
+TEST_CASE("Enumerate Entities in Container") {
   Container container;
   size_t counter = 0;
 
@@ -173,7 +173,27 @@ TEST_CASE("Iterate over Entities") {
     counter = count(container.entities().need<Position>().skip<Velocity>());
     CHECK(counter == 1);
   }
+}
 
+TEST_CASE("Enumerate Entities in vector") {
+  Container container;
+  auto counter = 0;
+
+  auto e0 = container.create();
+  e0.create_component<Position>(0, 0);
+  e0.create_component<Velocity>();
+
+  auto e1 = container.create();
+  e1.create_component<Position>(0, 0);
+
+  std::vector<Entity> es{ e0, e1 };
+  auto view = make_entity_view(es);
+
+  counter = count(view.need<Position>());
+  CHECK(counter == 2);
+
+  counter = count(view.need<Position, Velocity>());
+  CHECK(counter == 1);
 }
 
 TEST_CASE("Create Components") {
@@ -310,7 +330,7 @@ TEST_CASE("Non-POD Components") {
   }
 }
 
-TEST_CASE("ComponentView") {
+TEST_CASE("ComponentSet") {
   Container container;
 
   auto e  = container.create();
@@ -321,9 +341,13 @@ TEST_CASE("ComponentView") {
   CHECK(&cs0.get<Position>() == c0.get());
   CHECK(&cs0.get<Velocity>() == c1.get());
 
-  auto cs1 = make_component_view(c0, c1);
+  auto cs1 = make_component_set(c0, c1);
   CHECK(&cs1.get<Position>() == c0.get());
   CHECK(&cs1.get<Velocity>() == c1.get());
+
+  auto cs2 = e.components<Position, Velocity>();
+  CHECK(cs2.get<Position*>() == c0.get());
+  CHECK(cs2.get<Velocity*>() == c1.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

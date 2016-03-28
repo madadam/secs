@@ -9,7 +9,8 @@
 namespace secs {
 
 template<typename> class ComponentPtr;
-template<typename...> class ComponentView;
+template<typename...> class ComponentSet;
+template<typename> class ComponentStore;
 class Container;
 
 class Entity {
@@ -24,7 +25,10 @@ public:
   template<typename T> ComponentPtr<T> component() const;
 
   template<typename... Ts>
-  ComponentView<Ts...> components() const;
+  ComponentSet<Ts...> components() const;
+
+  template<typename... Ts>
+  ComponentSet<Ts...> components(const std::tuple<ComponentStore<Ts>*...>&) const;
 
   // Create a Component of the given type using the given arguments for the
   // Component constructor.

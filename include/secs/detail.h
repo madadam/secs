@@ -5,25 +5,25 @@
 namespace secs {
 namespace detail {
 
-// Test if tuple contains the given type.
+// Test if type pack Us contains the type T.
 namespace help {
-template<typename T, typename E>
+template<typename T, typename... Us>
 struct Contains;
 
-template<typename T, typename... Ts, typename E>
-struct Contains<std::tuple<T, Ts...>, E> {
-  static const bool value = std::is_same<T, E>::value
-                         || Contains<std::tuple<Ts...>, E>::value;
+template<typename T, typename U, typename... Us>
+struct Contains<T, U, Us...> {
+  static const bool value = std::is_same<T, U>::value
+                         || Contains<T, Us...>::value;
 };
 
-template<typename E>
-struct Contains<std::tuple<>, E> {
+template<typename T>
+struct Contains<T> {
   static const bool value = false;
 };
 }
 
-template<typename T, typename E>
-constexpr bool Contains = help::Contains<T, E>::value;
+template<typename... Ts>
+constexpr bool Contains = help::Contains<Ts...>::value;
 
 
 

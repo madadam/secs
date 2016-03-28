@@ -1,7 +1,7 @@
 #pragma once
 
 #include "secs/component_ptr.h"
-#include "secs/component_view.h"
+#include "secs/component_set.h"
 #include "secs/container.h"
 #include "secs/entity.h"
 #include "secs/entity_view.h"
@@ -9,8 +9,7 @@
 
 namespace secs {
 
-inline EntityView<std::tuple<>, std::tuple<>, std::tuple<>>
-Container::entities() {
+inline ContainerEntityView<> Container::entities() {
   return { *this };
 }
 
@@ -94,14 +93,20 @@ void Entity::destroy_component() const {
 }
 
 template<typename... Ts>
-ComponentView<Ts...> Entity::components() const {
-  assert(*this);
-  return { std::make_tuple(&_container->store<Ts>()...), _index, _version };
+ComponentSet<Ts...> Entity::components() const {
+  return components(_container->store_ptrs<Ts...>());
 }
 
-// ComponentView implementation
 template<typename... Ts>
-ComponentView<Ts...>::ComponentView(
+ComponentSet<Ts...>
+Entity::components(const std::tuple<ComponentStore<Ts>*...>& stores) const {
+  assert(*this);
+  return { stores, _index, _version };
+}
+
+// ComponentSet implementation
+template<typename... Ts>
+ComponentSet<Ts...>::ComponentSet(
     const std::tuple<ComponentStore<Ts>*...>& stores
   , size_t                                    index
   , Version                                   version)
