@@ -13,10 +13,6 @@ class LoadedEntity {
 public:
   LoadedEntity() {}
 
-  LoadedEntity(const Entity& entity)
-    : LoadedEntity(entity, entity.container().store_ptrs<Ts...>())
-  {}
-
   LoadedEntity( const Entity&                             entity
               , const std::tuple<ComponentStore<Ts>*...>& stores)
     : _entity(entity)
@@ -27,26 +23,31 @@ public:
     }));
   }
 
+  // Convert LoadedEntity<Us...> to LoadedEntity<Ts...> only if Ts... is subset
+  // of Us...
   template<typename... Us>
-  LoadedEntity(const LoadedEntity<Us...>& other)
-    : LoadedEntity( other._entity
-                  , std::make_tuple(std::get<ComponentStore<Ts>*>(other._stores)...))
-  {
-    static_assert( detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
-                 , "Ts... is not subset of Us...");
+  LoadedEntity(
+      const LoadedEntity<Us...>& other
+    , std::enable_if_t< detail::IsSubset< std::tuple<Ts...>
+                                        , std::tuple<Us...>>>* = nullptr)
+    : LoadedEntity(
+        other._entity
+      , std::make_tuple(std::get<ComponentStore<Ts>*>(other._stores)...))
+  {}
 
-  }
-
+  // Assign LoadedEntity<Us...> to LoadedEntity<Ts...> only if Ts... is subset
+  // of Us...
   template<typename... Us>
-  // std::enable_if_t< detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
-  //                 , LoadedEntity<Ts...>&>
-  LoadedEntity<Ts...>& operator = (const LoadedEntity<Us...>& other) {
-    static_assert( detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
-                 , "Ts... is not subset of Us...");
-
+  std::enable_if_t< detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
+                  , LoadedEntity<Ts...>&>
+  operator = (const LoadedEntity<Us...>& other) {
     _entity = other._entity;
     _stores = std::make_tuple(std::get<ComponentStore<Ts>*>(other._stores)...);
     return *this;
+  }
+
+  explicit operator bool () const {
+    return (bool) _entity;
   }
 
   template<typename T>
@@ -105,7 +106,7 @@ public:
   }
 
   LoadedEntity<Ts...> copy_to(Container& target) const {
-    return { _entity.copy_to(target) };
+    return { _entity.copy_to(target), target.store_ptrs<Ts...>() };
   }
 
   void destroy() const {
@@ -114,9 +115,20 @@ public:
 
   template<typename... Us>
   LoadedEntity<Ts..., Us...>
+  load() const {
+    static_assert( detail::IsDisjoint<std::tuple<Ts...>, std::tuple<Us...>>
+                 , "Ts... and Us... cannot contain the same type");
+
+    return { _entity
+           , std::tuple_cat( _stores
+                           , container().template store_ptrs<Us...>()) };
+  }
+
+  template<typename... Us>
+  LoadedEntity<Ts..., Us...>
   load(const std::tuple<ComponentStore<Us>*...>& more_stores) const {
     static_assert( detail::IsDisjoint<std::tuple<Ts...>, std::tuple<Us...>>
-                 , "Cannot load already loaded type");
+                 , "Ts... and Us... cannot contain the same type");
 
     return { _entity, std::tuple_cat(_stores, more_stores) };
   }

@@ -100,7 +100,7 @@ void Entity::destroy_component() const {
 
 template<typename... Ts>
 LoadedEntity<Ts...> Entity::load() const {
-  return LoadedEntity<Ts...>(*this);
+  return { *this, _container->store_ptrs<Ts...>() };
 }
 
 template<typename... Ts>
