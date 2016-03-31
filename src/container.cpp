@@ -3,8 +3,8 @@
 using namespace secs;
 
 Container::~Container() {
-  for (auto c : entities()) {
-    destroy(c.entity());
+  for (auto e : entities()) {
+    e.destroy();
   }
 }
 

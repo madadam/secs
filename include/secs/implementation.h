@@ -1,15 +1,16 @@
 #pragma once
 
+#include "secs/loaded_entity.h"
 #include "secs/component_ptr.h"
-#include "secs/component_set.h"
 #include "secs/container.h"
+#include "secs/container_entity_view.h"
 #include "secs/entity.h"
 #include "secs/entity_view.h"
 #include "secs/lifetime_events.h"
 
 namespace secs {
 
-inline ContainerEntityView<> Container::entities() {
+inline LoadEntityView<ContainerEntityView> Container::entities() {
   return { *this };
 }
 
@@ -93,26 +94,14 @@ void Entity::destroy_component() const {
 }
 
 template<typename... Ts>
-ComponentSet<Ts...> Entity::components() const {
-  return components(_container->store_ptrs<Ts...>());
+LoadedEntity<Ts...> Entity::load() const {
+  return LoadedEntity<Ts...>(*this);
 }
 
 template<typename... Ts>
-ComponentSet<Ts...>
-Entity::components(const std::tuple<ComponentStore<Ts>*...>& stores) const {
-  assert(*this);
-  return { stores, _index, _version };
+LoadedEntity<Ts...>
+Entity::load(const std::tuple<ComponentStore<Ts>*...>& stores) const {
+  return LoadedEntity<Ts...>(*this, stores);
 }
-
-// ComponentSet implementation
-template<typename... Ts>
-ComponentSet<Ts...>::ComponentSet(
-    const std::tuple<ComponentStore<Ts>*...>& stores
-  , size_t                                    index
-  , Version                                   version)
-  : _stores(stores)
-  , _index(index)
-  , _version(version)
-{}
 
 } // namespace secs

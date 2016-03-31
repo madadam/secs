@@ -151,10 +151,10 @@ TEST_CASE("Enumerate Entities in Container") {
     size_t ps = 0;
     size_t vs = 0;
 
-    for (auto c : container.entities().load<Position, Velocity>()) {
+    for (auto e : container.entities().load<Position, Velocity>()) {
       ++counter;
-      if (c.get<Position*>()) ++ps;
-      if (c.get<Velocity*>()) ++vs;
+      if (e.component<Position>()) ++ps;
+      if (e.component<Velocity>()) ++vs;
     }
 
     CHECK(counter == 3);
@@ -325,29 +325,9 @@ TEST_CASE("Non-POD Components") {
   e0.create_component<Name>("foo");
   e1.create_component<Name>("bar");
 
-  for (auto c : container.entities().need<Name>()) {
-    auto name = c.get<Name>().name;
+  for (auto e : container.entities().need<Name>()) {
+    auto name = e.component<Name>()->name;
   }
-}
-
-TEST_CASE("ComponentSet") {
-  Container container;
-
-  auto e  = container.create();
-  auto c0 = e.create_component<Position>(123, 456);
-  auto c1 = e.create_component<Velocity>();
-
-  auto cs0 = e.components<Position, Velocity>();
-  CHECK(&cs0.get<Position>() == c0.get());
-  CHECK(&cs0.get<Velocity>() == c1.get());
-
-  auto cs1 = make_component_set(c0, c1);
-  CHECK(&cs1.get<Position>() == c0.get());
-  CHECK(&cs1.get<Velocity>() == c1.get());
-
-  auto cs2 = e.components<Position, Velocity>();
-  CHECK(cs2.get<Position*>() == c0.get());
-  CHECK(cs2.get<Velocity*>() == c1.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

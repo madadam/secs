@@ -7,10 +7,6 @@ Entity::operator bool () const {
   return _container && _container->contains(_index, _version);
 }
 
-Entity Entity::copy() const {
-  return copy_to(*_container);
-}
-
 Entity Entity::copy_to(Container& target) const {
   assert(*this);
 
