@@ -23,8 +23,8 @@ public:
   std::string name;
 };
 
-template<typename T>
-void unused(T) {}
+template<typename... Ts>
+void unused(Ts...) {}
 
 template<typename E>
 size_t count(E entities) {
@@ -366,3 +366,24 @@ TEST_CASE("Lifetime events") {
   CHECK(subscriber.created   == 1);
   CHECK(subscriber.destroyed == 1);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+TEST_CASE("LoadedEntity conversions") {
+  Container container;
+  auto le = container.create().load<Position, Velocity>();
+
+  // Entity can be constructed/assigned from LoadedEntity<T...>
+  Entity e0(le);
+  Entity e1 = le;
+  Entity e2;
+  e2 = le;
+
+  // LoadedEntity<A, B> can be constructed/assigned from LoadedEntity<A, B, C...>
+  LoadedEntity<Position> e3(le);
+  LoadedEntity<Position> e4 = le;
+  LoadedEntity<Position> e5;
+  e5 = le;
+
+  unused(e0, e1, e2, e3, e4, e5);
+}
+

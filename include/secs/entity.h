@@ -20,6 +20,9 @@ public:
     , _index(0)
   {}
 
+  template<typename... Ts>
+  Entity(const LoadedEntity<Ts...>& other);
+
   explicit operator bool () const;
 
   template<typename T> ComponentPtr<T> component() const;

@@ -74,6 +74,11 @@ void ComponentOps::destroy(const Entity& entity) {
 
 
 // Entity implementation
+template<typename... Ts>
+Entity::Entity(const LoadedEntity<Ts...>& other)
+  : Entity(other._entity)
+{}
+
 template<typename T>
 ComponentPtr<T> Entity::component() const {
   assert(*this);

@@ -27,8 +27,27 @@ public:
     }));
   }
 
-  // template<typename... Us>
-  // LoadedEntity()
+  template<typename... Us>
+  LoadedEntity(const LoadedEntity<Us...>& other)
+    : LoadedEntity( other._entity
+                  , std::make_tuple(std::get<ComponentStore<Ts>*>(other._stores)...))
+  {
+    static_assert( detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
+                 , "Ts... is not subset of Us...");
+
+  }
+
+  template<typename... Us>
+  // std::enable_if_t< detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
+  //                 , LoadedEntity<Ts...>&>
+  LoadedEntity<Ts...>& operator = (const LoadedEntity<Us...>& other) {
+    static_assert( detail::IsSubset<std::tuple<Ts...>, std::tuple<Us...>>
+                 , "Ts... is not subset of Us...");
+
+    _entity = other._entity;
+    _stores = std::make_tuple(std::get<ComponentStore<Ts>*>(other._stores)...);
+    return *this;
+  }
 
   template<typename T>
   std::enable_if_t<detail::Contains<T, Ts...>, ComponentPtr<T>>
@@ -44,7 +63,17 @@ public:
   template<typename T>
   std::enable_if_t<!detail::Contains<T, Ts...>, ComponentPtr<T>>
   component() const {
-    return Entity::component<T>();
+    return _entity.component<T>();
+  }
+
+  template<typename T, typename... Args>
+  ComponentPtr<T> create_component(Args&&... args) const {
+    return _entity.create_component<T, Args...>(std::forward<Args>(args)...);
+  }
+
+  template<typename T>
+  void destroy_component() const {
+    _entity.destroy_component<T>();
   }
 
   template<typename U0, typename U1, typename... Us>
@@ -72,11 +101,11 @@ public:
   }
 
   LoadedEntity<Ts...> copy() const {
-    return { Entity::copy(), _stores };
+    return { _entity.copy(), _stores };
   }
 
   LoadedEntity<Ts...> copy_to(Container& target) const {
-    return { Entity::copy_to(target) };
+    return { _entity.copy_to(target) };
   }
 
   void destroy() const {
@@ -96,6 +125,9 @@ private:
   Entity                             _entity;
   std::tuple<ComponentStore<Ts>*...> _stores;
 
+  friend class Entity;
+  template<typename...> friend class LoadedEntity;
+
   template<typename... As, typename... Bs>
   friend bool operator == ( const LoadedEntity<As...>&
                           , const LoadedEntity<Bs...>&);
@@ -103,7 +135,6 @@ private:
   template<typename... As, typename... Bs>
   friend bool operator < ( const LoadedEntity<As...>&
                          , const LoadedEntity<Bs...>&);
-
 };
 
 template<typename... As, typename... Bs>
