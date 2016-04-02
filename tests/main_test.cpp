@@ -196,6 +196,34 @@ TEST_CASE("Enumerate Entities in vector") {
   CHECK(counter == 1);
 }
 
+TEST_CASE("Entity view iterators traits") {
+  Container container;
+
+  using I0 = decltype(container.entities().begin());
+  CHECK((std::is_same< std::iterator_traits<I0>::difference_type
+                     , ptrdiff_t>::value));
+  CHECK((std::is_same< std::iterator_traits<I0>::value_type
+                     , LoadedEntity<>>::value));
+
+  using I1 = decltype(container.entities().load<Position>().begin());
+  CHECK((std::is_same< std::iterator_traits<I1>::difference_type
+                     , ptrdiff_t>::value));
+  CHECK((std::is_same< std::iterator_traits<I1>::value_type
+                     , LoadedEntity<Position>>::value));
+
+  using I2 = decltype(container.entities().need<Position>().begin());
+  CHECK((std::is_same< std::iterator_traits<I2>::difference_type
+                     , ptrdiff_t>::value));
+  CHECK((std::is_same< std::iterator_traits<I2>::value_type
+                     , LoadedEntity<Position>>::value));
+
+  using I3 = decltype(container.entities().skip<Position>().begin());
+  CHECK((std::is_same< std::iterator_traits<I3>::difference_type
+                     , ptrdiff_t>::value));
+  CHECK((std::is_same< std::iterator_traits<I3>::value_type
+                     , LoadedEntity<Position>>::value));
+}
+
 TEST_CASE("Create Components") {
   Container container;
   auto e = container.create();

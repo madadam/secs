@@ -86,7 +86,13 @@ class LoadEntityView
   // TODO: static assert that Source's loaded types and Ts are disjoint
 
 public:
-  class Iterator {
+  using value_type = decltype(
+    (*std::declval<detail::Iterator<Source>>())
+    .load(std::declval<detail::ComponentStores<Ts...>>()));
+
+public:
+  class Iterator : public std::iterator<std::forward_iterator_tag, value_type>
+  {
   public:
     bool operator == (const Iterator& other) const {
       return _source == other._source;
@@ -160,7 +166,11 @@ class FilteredEntityView : public EntityViewExtensions<Base> {
   static_assert(detail::IsEntityRange<Source>, "Source is not Entity range");
 
 public:
-  class Iterator {
+  class Iterator
+    : public std::iterator<
+          std::forward_iterator_tag
+        , typename std::iterator_traits<detail::Iterator<Source>>::value_type>
+  {
   public:
     bool operator == (const Iterator& other) const {
       return _source == other._source;

@@ -8,7 +8,7 @@ namespace secs {
 
 class ContainerEntityView {
 public:
-  class Iterator {
+  class Iterator : public std::iterator<std::forward_iterator_tag, Entity> {
   public:
     bool operator == (const Iterator& other) const {
       return _index == other._index;
