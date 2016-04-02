@@ -332,8 +332,8 @@ TEST_CASE("Non-POD Components") {
 
 ////////////////////////////////////////////////////////////////////////////////
 template<typename T>
-struct TestSubscriber : public Subscriber<AfterCreate<T>>
-                      , public Subscriber<AfterDestroy<T>>
+struct TestReceiver : public Receiver<AfterCreate<T>>
+                    , public Receiver<AfterDestroy<T>>
 {
   size_t created   = 0;
   size_t destroyed = 0;
@@ -349,7 +349,7 @@ struct TestSubscriber : public Subscriber<AfterCreate<T>>
 
 TEST_CASE("Lifetime events") {
   Container container;
-  TestSubscriber<Position> subscriber;
+  TestReceiver<Position> subscriber;
 
   container.subscribe<AfterCreate<Position>>(subscriber);
   container.subscribe<AfterDestroy<Position>>(subscriber);

@@ -3,7 +3,7 @@
 
 using namespace secs;
 
-Entity::operator bool () const {
+Entity::operator bool () const noexcept {
   return _container && _container->contains(_index, _version);
 }
 

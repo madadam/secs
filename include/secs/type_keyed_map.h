@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "secs/type_index.h"
+#include "secs/type_indexer.h"
 
 // Map-like container where keys are types.
 
@@ -26,13 +26,13 @@ public:
 
   template<typename T>
   V* find() {
-    auto index = _type_index.get<T>();
+    auto index = _type_indexer.get<T>();
     return index < _values.size() ? &_values[index] : nullptr;
   }
 
   template<typename T>
   const V* find() const {
-    auto index = _type_index.get<T>();
+    auto index = _type_indexer.get<T>();
     return index < _values.size() ? &_values[index] : nullptr;
   }
 
@@ -58,7 +58,7 @@ private:
 
   template<typename T>
   size_t reserve() {
-    auto index = _type_index.get<T>();
+    auto index = _type_indexer.get<T>();
 
     if (index >= _values.size()) {
       _values.resize(index + 1);
@@ -68,7 +68,7 @@ private:
   }
 
 private:
-  TypeIndex       _type_index;
+  TypeIndexer     _type_indexer;
   std::vector<V>  _values;
 };
 

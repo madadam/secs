@@ -2,7 +2,7 @@
 
 #include <tuple>
 #include "secs/any.h"
-#include "secs/type_index.h"
+#include "secs/type_indexer.h"
 
 // Container that contains one instance of every default-constructible type
 // in the universe.
@@ -13,7 +13,7 @@ class Omniset {
 public:
   template<typename T>
   T& get() const {
-    auto index = _type_index.get<T>();
+    auto index = _type_indexer.get<T>();
 
     if (index >= _store.size()) {
       _store.resize(index + 1);
@@ -34,7 +34,7 @@ public:
   }
 
 private:
-  TypeIndex                _type_index;
+  TypeIndexer              _type_indexer;
   mutable std::vector<Any> _store;
 };
 

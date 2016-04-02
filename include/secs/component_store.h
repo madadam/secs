@@ -3,14 +3,16 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
-#include "secs/store.h"
 #include "secs/version.h"
 
 namespace secs {
-
 namespace detail {
+  template<typename T>
+  using Store = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+
   template<typename T>
   T* ptr(Store<T>* data, size_t index) {
     return reinterpret_cast<T*>(data + index);
@@ -42,7 +44,7 @@ namespace detail {
   move(Store<T>* dst, Store<T>* src, size_t count, const std::vector<Version>&) {
     std::memcpy( reinterpret_cast<void*>(dst)
                , reinterpret_cast<void*>(src)
-               , count * store_size<T>);
+               , count * sizeof(Store<T>));
   }
 
 } // namespace detail
@@ -101,7 +103,7 @@ public:
 
 
 private:
-  using Slot = Store<T>;
+  using Slot = detail::Store<T>;
 
   static constexpr double GROW_RATE = 1.5;
 

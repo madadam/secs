@@ -17,7 +17,7 @@ public:
   ComponentPtr(std::nullptr_t) : ComponentPtr()
   {}
 
-  explicit operator bool () const {
+  explicit operator bool () const noexcept {
     return _store && _store->contains(_index, _version);
   }
 

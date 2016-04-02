@@ -16,7 +16,7 @@ namespace secs {
 //
 //
 // TODO: optimize this
-struct TypeIndex {
+struct TypeIndexer {
 private:
   typedef void (*Key)();
 

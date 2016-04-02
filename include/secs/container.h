@@ -15,7 +15,7 @@ template<typename> class ComponentPtr;
 class ContainerEntityView;
 class Entity;
 template<typename, typename...> class LoadEntityView;
-template<typename> class Subscriber;
+template<typename> class Receiver;
 
 class Container {
 public:
@@ -37,16 +37,16 @@ public:
 
   Entity get(size_t index);
 
-  template<typename E> void subscribe(Subscriber<E>& subscriber) {
-    _event_manager.subscribe<E>(subscriber);
+  template<typename E> void subscribe(Receiver<E>& receiver) {
+    _event_manager.subscribe<E>(receiver);
   }
 
-  template<typename E> void unsubscribe(Subscriber<E>& subscriber) {
-    _event_manager.unsubscribe<E>(subscriber);
+  template<typename E> void unsubscribe(Receiver<E>& receiver) {
+    _event_manager.unsubscribe<E>(receiver);
   }
 
-  template<typename E> void emit(const E& event) {
-    _event_manager.emit(event);
+  template<typename E> void send(const E& event) {
+    _event_manager.send(event);
   }
 
 private:

@@ -6,68 +6,68 @@
 
 namespace secs {
 
-template<typename> class Publisher;
-template<typename> class Subscriber;
+template<typename> class Sender;
+template<typename> class Receiver;
 
 class EventManager {
 public:
 
   template<typename E>
-  void subscribe(Subscriber<E>& subscriber) {
-    _publishers.get<Publisher<E>>().subscribe(subscriber);
+  void subscribe(Receiver<E>& receiver) {
+    _senders.get<Sender<E>>().subscribe(receiver);
   }
 
   template<typename E>
-  void unsubscribe(Subscriber<E>& subscriber) {
-    _publishers.get<Publisher<E>>().unsubscribe(subscriber);
+  void unsubscribe(Receiver<E>& receiver) {
+    _senders.get<Sender<E>>().unsubscribe(receiver);
   }
 
   template<typename E>
-  void emit(const E& event) const {
-    _publishers.get<Publisher<E>>().emit(event);
+  void send(const E& event) const {
+    _senders.get<Sender<E>>().send(event);
   }
 
 private:
 
-  Omniset _publishers;
+  Omniset _senders;
 };
 
 template<typename E>
-class Subscriber {
+class Receiver {
 public:
-  Subscriber() = default;
-  Subscriber(const Subscriber<E>&) = delete;
+  Receiver() = default;
+  Receiver(const Receiver<E>&) = delete;
 
-  Subscriber(Subscriber<E>&& other)
-    : _publisher(other._publisher)
+  Receiver(Receiver<E>&& other)
+    : _sender(other._sender)
   {
-    if (_publisher) {
-      auto it = std::find( _publisher->_subscribers.begin()
-                         , _publisher->_subscribers.end()
+    if (_sender) {
+      auto it = std::find( _sender->_receivers.begin()
+                         , _sender->_receivers.end()
                          , &other);
 
-      if (it != _publisher->_subscribers.end()) {
+      if (it != _sender->_receivers.end()) {
         *it = this;
       }
     }
   }
 
-  virtual ~Subscriber() {
-    if (_publisher) {
-      _publisher->unsubscribe(*this);
+  virtual ~Receiver() {
+    if (_sender) {
+      _sender->unsubscribe(*this);
     }
   }
 
-  Subscriber<E>& operator = (const Subscriber<E>&) = delete;
+  Receiver<E>& operator = (const Receiver<E>&) = delete;
 
-  Subscriber<E>& operator = (Subscriber<E>&& other) {
-    if (_publisher) {
-      _publisher->unsubscribe(*this);
+  Receiver<E>& operator = (Receiver<E>&& other) {
+    if (_sender) {
+      _sender->unsubscribe(*this);
     }
 
-    if (other._publisher) {
-      other._publisher->subscribe(*this);
-      other._publisher->unsubscribe(other);
+    if (other._sender) {
+      other._sender->subscribe(*this);
+      other._sender->unsubscribe(other);
     }
 
     return *this;
@@ -76,73 +76,73 @@ public:
   virtual void receive(const E&) {}
 
 private:
-  Publisher<E>* _publisher = nullptr;
-  friend class Publisher<E>;
+  Sender<E>* _sender = nullptr;
+  friend class Sender<E>;
 };
 
 template<typename E>
-class Publisher {
+class Sender {
 public:
-  Publisher() = default;
-  Publisher(const Publisher<E>&) = delete;
+  Sender() = default;
+  Sender(const Sender<E>&) = delete;
 
-  Publisher(Publisher<E>&& other)
-    : _subscribers(std::move(other._subscribers))
+  Sender(Sender<E>&& other)
+    : _receivers(std::move(other._receivers))
   {
-    for (auto subscriber : _subscribers) {
-      if (subscriber) subscriber->_publisher = this;
+    for (auto receiver : _receivers) {
+      if (receiver) receiver->_sender = this;
     }
   }
 
-  ~Publisher() {
-    for (auto subscriber : _subscribers) {
-      if (subscriber) subscriber->_publisher = nullptr;
+  ~Sender() {
+    for (auto receiver : _receivers) {
+      if (receiver) receiver->_sender = nullptr;
     }
   }
 
-  Publisher<E>& operator = (const Publisher<E>&) = delete;
+  Sender<E>& operator = (const Sender<E>&) = delete;
 
-  Publisher<E>& operator = (Publisher<E>&& other) {
-    _subscribers = std::move(other._subscribers);
+  Sender<E>& operator = (Sender<E>&& other) {
+    _receivers = std::move(other._receivers);
 
-    for (auto subscriber : _subscribers) {
-      if (subscriber) subscriber->_publisher = this;
+    for (auto receiver : _receivers) {
+      if (receiver) receiver->_sender = this;
     }
 
     return *this;
   }
 
-  void subscribe(Subscriber<E>& subscriber) {
-    if (subscriber._publisher == this) return;
+  void subscribe(Receiver<E>& receiver) {
+    if (receiver._sender == this) return;
 
-    if (subscriber._publisher) {
-      subscriber._publisher->unsubscribe(subscriber);
+    if (receiver._sender) {
+      receiver._sender->unsubscribe(receiver);
     }
 
-    subscriber._publisher = this;
-    _subscribers.push_back(&subscriber);
+    receiver._sender = this;
+    _receivers.push_back(&receiver);
   }
 
-  void unsubscribe(Subscriber<E>& subscriber) {
-    if (subscriber._publisher != this) return;
+  void unsubscribe(Receiver<E>& receiver) {
+    if (receiver._sender != this) return;
 
-    auto it = std::find(_subscribers.begin(), _subscribers.end(), &subscriber);
+    auto it = std::find(_receivers.begin(), _receivers.end(), &receiver);
 
-    if (it != _subscribers.end()) {
-      _subscribers.erase(it);
-      subscriber._publisher = nullptr;
+    if (it != _receivers.end()) {
+      _receivers.erase(it);
+      receiver._sender = nullptr;
     }
   }
 
-  void emit(const E& event) const {
-    for (auto subscriber : _subscribers) {
-      subscriber->receive(event);
+  void send(const E& event) const {
+    for (auto receiver : _receivers) {
+      receiver->receive(event);
     }
   }
 
 private:
-  std::vector<Subscriber<E>*> _subscribers;
-  friend class Subscriber<E>;
+  std::vector<Receiver<E>*> _receivers;
+  friend class Receiver<E>;
 };
 
 } // namespace secs

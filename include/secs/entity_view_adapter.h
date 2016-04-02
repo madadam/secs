@@ -56,8 +56,6 @@ Container* get_container(const R& range) {
   }
 }
 
-// TODO: specialize get_container for ContainerEntityView and others
-
 ////////////////////////////////////////////////////////////////////////////////
 template<typename Base>
 class EntityViewExtensions {

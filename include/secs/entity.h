@@ -23,7 +23,7 @@ public:
   template<typename... Ts>
   Entity(const LoadedEntity<Ts...>& other);
 
-  explicit operator bool () const;
+  explicit operator bool () const noexcept;
 
   template<typename T> ComponentPtr<T> component() const;
 
