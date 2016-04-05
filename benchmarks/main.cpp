@@ -14,7 +14,7 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-using secs::Container;
+using namespace secs;
 
 struct Velocity {
   float x = 0;
@@ -33,7 +33,7 @@ void benchmark(const string& label, F&& body) {
   body();
   auto t1 = chrono::high_resolution_clock::now();
 
-  cout << std::left << std::setw(40) << label
+  cout << std::left << std::setw(50) << label
        << ": "
        << std::right << std::setw(8)
        << chrono::duration_cast<chrono::nanoseconds>(t1 - t0).count()
@@ -68,7 +68,7 @@ void iterate_vector_of_values() {
 
   float result = 0;
 
-  benchmark("vector of values", [&]() {
+  benchmark("iterate vector of values", [&]() {
     for (auto& input : inputs) {
       result += compute(input);
     }
@@ -87,7 +87,7 @@ void iterate_vector_of_pointers() {
 
   float result = 0;
 
-  benchmark("vector of pointers", [&]() {
+  benchmark("iterate vector of pointers", [&]() {
     for (auto& input : inputs) {
       result += compute(*input);
     }
@@ -96,7 +96,7 @@ void iterate_vector_of_pointers() {
   use(result);
 }
 
-void iterate_container_without_load() {
+void iterate_container() {
   Container container;
 
   for (size_t i = 0; i < COUNT; ++i) {
@@ -106,7 +106,7 @@ void iterate_container_without_load() {
 
   float result = 0;
 
-  benchmark("container without load", [&]() {
+  benchmark("iterate container", [&]() {
     for (auto e : container.entities()) {
       result += compute(*e.component<Velocity>());
     }
@@ -115,7 +115,7 @@ void iterate_container_without_load() {
   use(result);
 }
 
-void iterate_container_with_load() {
+void iterate_container_with_required_components() {
   Container container;
 
   for (size_t i = 0; i < COUNT; ++i) {
@@ -125,8 +125,27 @@ void iterate_container_with_load() {
 
   float result = 0;
 
-  benchmark("container with load", [&]() {
+  benchmark("iterate container with required components", [&]() {
     for (auto e : container.entities<Velocity>()) {
+      result += compute(*e.component<Velocity>());
+    }
+  });
+
+  use(result);
+}
+
+void iterate_container_with_optional_components() {
+  Container container;
+
+  for (size_t i = 0; i < COUNT; ++i) {
+    auto e = container.create();
+    e.create_component<Velocity>(random_number(), random_number());
+  }
+
+  float result = 0;
+
+  benchmark("iterate container with optional components", [&]() {
+    for (auto e : container.entities<Optional<Velocity>>()) {
       result += compute(*e.component<Velocity>());
     }
   });
@@ -173,8 +192,9 @@ void compare_component_ptr_and_raw_ptr() {
 int main() {
   iterate_vector_of_values();
   iterate_vector_of_pointers();
-  iterate_container_without_load();
-  iterate_container_with_load();
+  iterate_container();
+  iterate_container_with_required_components();
+  iterate_container_with_optional_components();
 
   compare_component_ptr_and_raw_ptr();
 

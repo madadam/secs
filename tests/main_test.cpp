@@ -180,7 +180,7 @@ TEST_CASE("Enumerate Entities in vector") {
   CHECK(counter == 1);
 }
 
-TEST_CASE("Entity view iterators traits") {
+TEST_CASE("Entity iterators traits") {
   Container container;
 
   using I0 = decltype(container.entities().begin());

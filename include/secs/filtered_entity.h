@@ -47,12 +47,12 @@ public:
     return _entity.container();
   }
 
-  FilteredEntity<Ts...> copy() const {
-    return { _entity.copy(), _stores };
+  Entity copy() const {
+    return _entity.copy();
   }
 
-  FilteredEntity<Ts...> copy_to(Container& target) const {
-    return { _entity.copy_to(target), target.store_ptrs<Ts...>() };
+  Entity copy_to(Container& target) const {
+    return _entity.copy_to(target);
   }
 
   void destroy() const {
