@@ -55,7 +55,7 @@ private:
 
   friend class Container;
   friend class Entity;
-  template<typename...> friend class LoadedEntity;
+  template<typename...> friend class FilteredEntity;
 };
 
 template<typename T>

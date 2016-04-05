@@ -126,7 +126,7 @@ void iterate_container_with_load() {
   float result = 0;
 
   benchmark("container with load", [&]() {
-    for (auto e : container.entities().load<Velocity>()) {
+    for (auto e : container.entities<Velocity>()) {
       result += compute(*e.component<Velocity>());
     }
   });
@@ -148,7 +148,7 @@ void compare_component_ptr_and_raw_ptr() {
   std::vector<Velocity*> raw_ptrs;
   raw_ptrs.reserve(COUNT);
 
-  for (auto e : container.entities().need<Velocity>()) {
+  for (auto e : container.entities<Velocity>()) {
     component_ptrs.push_back(e.component<Velocity>());
     raw_ptrs.push_back(e.component<Velocity>().get());
   }

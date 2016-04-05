@@ -6,7 +6,7 @@
 
 namespace secs {
 
-class ContainerEntityView {
+class EntityView {
 public:
   class Iterator : public std::iterator<std::forward_iterator_tag, Entity> {
   public:
@@ -54,10 +54,10 @@ public:
     Container& _container;
     size_t     _index;
 
-    friend class ContainerEntityView;
+    friend class EntityView;
   };
 
-  ContainerEntityView(Container& container)
+  EntityView(Container& container)
     : _container(container)
   {}
 
@@ -76,10 +76,10 @@ public:
 
 private:
   Container& _container;
-  friend Container* get_container(const ContainerEntityView&);
+  friend Container* get_container(const EntityView&);
 };
 
-inline Container* get_container(const ContainerEntityView& range) {
+inline Container* get_container(const EntityView& range) {
   return &range._container;
 }
 

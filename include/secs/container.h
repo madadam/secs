@@ -12,9 +12,9 @@
 
 namespace secs {
 template<typename> class ComponentPtr;
-class ContainerEntityView;
 class Entity;
-template<typename, typename...> class LoadEntityView;
+template<typename, typename...> class EntityFilter;
+class EntityView;
 template<typename> class Receiver;
 
 class Container {
@@ -27,9 +27,9 @@ public:
   // Destroy Entity.
   void destroy(const Entity& entity);
 
-  // Get collection of all Entities in this Container. This collection can be
-  // further refined using need(), skip() and load().
-  LoadEntityView<ContainerEntityView> entities();
+  // Get collection of all Entities in this Container.
+  template<typename... Ts>
+  EntityFilter<EntityView, Ts...> entities();
 
   size_t size() const {
     return _capacity - _holes.size();
@@ -78,11 +78,6 @@ private:
     return std::make_tuple(&_stores.get<ComponentStore<Ts>>()...);
   }
 
-  template<typename T>
-  bool contains_store(const ComponentStore<T>& other_store) const {
-    return &store<T>() == &other_store;
-  }
-
   template<typename T, typename... Args>
   ComponentPtr<T> create_component(const Entity&, Args&&... args);
 
@@ -107,10 +102,9 @@ private:
   Omniset                     _stores;
   TypeKeyedMap<ComponentOps>  _ops;
 
-  friend class ContainerEntityView;
   friend class Entity;
-  template<typename...> friend class LoadedEntity;
-  template<typename, typename...> friend class LoadEntityView;
+  template<typename, typename...> friend class EntityFilter;
+  friend class EntityView;
 };
 
 } // namespace secs

@@ -106,37 +106,22 @@ TEST_CASE("Enumerate Entities in Container") {
     CHECK(counter == 1);
   }
 
-  SECTION("need") {
-    counter = count(container.entities().need<Position>());
+  SECTION("required") {
+    counter = count(container.entities<Position>());
     CHECK(counter == 0);
 
     auto e0 = container.create();
     e0.create_component<Position>(123, 456);
-    counter = count(container.entities().need<Position>());
+    counter = count(container.entities<Position>());
     CHECK(counter == 1);
 
     auto e1 = container.create();
     e1.create_component<Velocity>();
-    counter = count(container.entities().need<Position>());
+    counter = count(container.entities<Position>());
     CHECK(counter == 1);
   }
 
-  SECTION("skip") {
-    counter = count(container.entities().skip<Position>());
-    CHECK(counter == 0);
-
-    auto e0 = container.create();
-    e0.create_component<Position>(123, 456);
-    counter = count(container.entities().skip<Position>());
-    CHECK(counter == 0);
-
-    auto e1 = container.create();
-    e1.create_component<Velocity>();
-    counter = count(container.entities().skip<Position>());
-    CHECK(counter == 1);
-  }
-
-  SECTION("load") {
+  SECTION("optional") {
     auto e0 = container.create();
     e0.create_component<Position>(0, 0);
     e0.create_component<Velocity>();
@@ -151,7 +136,7 @@ TEST_CASE("Enumerate Entities in Container") {
     size_t ps = 0;
     size_t vs = 0;
 
-    for (auto e : container.entities().load<Position, Velocity>()) {
+    for (auto e : container.entities<Optional<Position>, Optional<Velocity>>()) {
       ++counter;
       if (e.component<Position>()) ++ps;
       if (e.component<Velocity>()) ++vs;
@@ -162,7 +147,7 @@ TEST_CASE("Enumerate Entities in Container") {
     CHECK(vs == 1);
   }
 
-  SECTION("need + skip") {
+  SECTION("required + optional") {
     auto e0 = container.create();
     e0.create_component<Position>(0, 0);
     e0.create_component<Velocity>();
@@ -170,8 +155,8 @@ TEST_CASE("Enumerate Entities in Container") {
     auto e1 = container.create();
     e1.create_component<Position>(1, 0);
 
-    counter = count(container.entities().need<Position>().skip<Velocity>());
-    CHECK(counter == 1);
+    counter = count(container.entities<Position, Optional<Velocity>>());
+    CHECK(counter == 2);
   }
 }
 
@@ -187,12 +172,11 @@ TEST_CASE("Enumerate Entities in vector") {
   e1.create_component<Position>(0, 0);
 
   std::vector<Entity> es{ e0, e1 };
-  auto view = make_entity_view(es);
 
-  counter = count(view.need<Position>());
+  counter = count(filter<Position>(es));
   CHECK(counter == 2);
 
-  counter = count(view.need<Position, Velocity>());
+  counter = count(filter<Position, Velocity>(es));
   CHECK(counter == 1);
 }
 
@@ -203,25 +187,19 @@ TEST_CASE("Entity view iterators traits") {
   CHECK((std::is_same< std::iterator_traits<I0>::difference_type
                      , ptrdiff_t>::value));
   CHECK((std::is_same< std::iterator_traits<I0>::value_type
-                     , LoadedEntity<>>::value));
+                     , FilteredEntity<>>::value));
 
-  using I1 = decltype(container.entities().load<Position>().begin());
+  using I1 = decltype(container.entities<Optional<Position>>().begin());
   CHECK((std::is_same< std::iterator_traits<I1>::difference_type
                      , ptrdiff_t>::value));
   CHECK((std::is_same< std::iterator_traits<I1>::value_type
-                     , LoadedEntity<Position>>::value));
+                     , FilteredEntity<Position>>::value));
 
-  using I2 = decltype(container.entities().need<Position>().begin());
+  using I2 = decltype(container.entities<Position>().begin());
   CHECK((std::is_same< std::iterator_traits<I2>::difference_type
                      , ptrdiff_t>::value));
   CHECK((std::is_same< std::iterator_traits<I2>::value_type
-                     , LoadedEntity<Position>>::value));
-
-  using I3 = decltype(container.entities().skip<Position>().begin());
-  CHECK((std::is_same< std::iterator_traits<I3>::difference_type
-                     , ptrdiff_t>::value));
-  CHECK((std::is_same< std::iterator_traits<I3>::value_type
-                     , LoadedEntity<Position>>::value));
+                     , FilteredEntity<Position>>::value));
 }
 
 TEST_CASE("Create Components") {
@@ -353,7 +331,7 @@ TEST_CASE("Non-POD Components") {
   e0.create_component<Name>("foo");
   e1.create_component<Name>("bar");
 
-  for (auto e : container.entities().need<Name>()) {
+  for (auto e : container.entities<Name>()) {
     auto name = e.component<Name>()->name;
   }
 }
@@ -396,22 +374,17 @@ TEST_CASE("Lifetime events") {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-TEST_CASE("LoadedEntity conversions") {
+TEST_CASE("FilteredEntity conversions") {
   Container container;
-  auto le = container.create().load<Position, Velocity>();
+  container.create();
+  auto e0 = container.entities<Optional<Position>>().front();
 
-  // Entity can be constructed/assigned from LoadedEntity<T...>
-  Entity e0(le);
-  Entity e1 = le;
-  Entity e2;
-  e2 = le;
+  // Entity can be constructed/assigned from FilteredEntity<T...>
+  Entity e1(e0);
+  Entity e2 = e0;
+  Entity e3;
+  e3 = e0;
 
-  // LoadedEntity<A, B> can be constructed/assigned from LoadedEntity<A, B, C...>
-  LoadedEntity<Position> e3(le);
-  LoadedEntity<Position> e4 = le;
-  LoadedEntity<Position> e5;
-  e5 = le;
-
-  unused(e0, e1, e2, e3, e4, e5);
+  unused(e1, e2, e3);
 }
 

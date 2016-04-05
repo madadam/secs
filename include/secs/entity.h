@@ -11,7 +11,7 @@ namespace secs {
 template<typename> class ComponentPtr;
 template<typename> class ComponentStore;
 class Container;
-template<typename...> class LoadedEntity;
+template<typename...> class FilteredEntity;
 
 class Entity {
 public:
@@ -21,7 +21,7 @@ public:
   {}
 
   template<typename... Ts>
-  Entity(const LoadedEntity<Ts...>& other);
+  Entity(const FilteredEntity<Ts...>& other);
 
   explicit operator bool () const noexcept;
 
@@ -49,26 +49,6 @@ public:
     if (component<T>()) destroy_component<T>();
   }
 
-  template<typename U0, typename U1, typename... Us>
-  bool contains_all() const {
-    return contains_all<U0>() && contains_all<U1, Us...>();
-  }
-
-  template<typename U>
-  bool contains_all() const {
-    return (bool) component<U>();
-  }
-
-  template<typename U0, typename U1, typename... Us>
-  bool contains_none() const {
-    return contains_none<U0>() && contains_none<U1, Us...>();
-  }
-
-  template<typename U>
-  bool contains_none() const {
-    return ! (bool) component<U>();
-  }
-
   Container& container() const {
     return *_container;
   }
@@ -79,12 +59,6 @@ public:
 
   Entity copy_to(Container&) const;
   void destroy() const;
-
-  template<typename... Ts>
-  LoadedEntity<Ts...> load() const;
-
-  template<typename... Ts>
-  LoadedEntity<Ts...> load(const std::tuple<ComponentStore<Ts>*...>&) const;
 
 private:
   Entity(Container& container, size_t index, Version version)
@@ -99,7 +73,8 @@ private:
   Version    _version;
 
   friend class Container;
-  template<typename...> friend class LoadedEntity;
+  template<typename, typename...> friend class EntityFilter;
+  template<typename...> friend class FilteredEntity;
 
   friend bool operator == (const Entity&, const Entity&);
   friend bool operator < (const Entity&, const Entity&);

@@ -1,16 +1,16 @@
 #pragma once
 
-#include "secs/loaded_entity.h"
 #include "secs/component_ptr.h"
 #include "secs/container.h"
-#include "secs/container_entity_view.h"
 #include "secs/entity.h"
-#include "secs/entity_view_adapter.h"
+#include "secs/entity_filter.h"
+#include "secs/entity_view.h"
 #include "secs/lifetime_events.h"
 
 namespace secs {
 
-inline LoadEntityView<ContainerEntityView> Container::entities() {
+template<typename... Ts>
+inline EntityFilter<EntityView, Ts...> Container::entities() {
   return { *this };
 }
 
@@ -75,7 +75,7 @@ void ComponentOps::destroy(const Entity& entity) {
 
 // Entity implementation
 template<typename... Ts>
-Entity::Entity(const LoadedEntity<Ts...>& other)
+Entity::Entity(const FilteredEntity<Ts...>& other)
   : Entity(other._entity)
 {}
 
@@ -96,17 +96,6 @@ template<typename T>
 void Entity::destroy_component() const {
   assert(*this);
   _container->destroy_component<T>(*this);
-}
-
-template<typename... Ts>
-LoadedEntity<Ts...> Entity::load() const {
-  return { *this, _container->store_ptrs<Ts...>() };
-}
-
-template<typename... Ts>
-LoadedEntity<Ts...>
-Entity::load(const std::tuple<ComponentStore<Ts>*...>& stores) const {
-  return LoadedEntity<Ts...>(*this, stores);
 }
 
 } // namespace secs
