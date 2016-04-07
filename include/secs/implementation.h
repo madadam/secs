@@ -8,6 +8,56 @@
 #include "secs/lifetime_events.h"
 
 namespace secs {
+namespace detail {
+
+// Test that T has on_create() member.
+template<typename T>
+struct has_on_create {
+private:
+  template<typename U>
+  static constexpr decltype(std::declval<U>().on_create(Entity()), true)
+  test(int) { return true; }
+
+  template<typename>
+  static constexpr bool test(...) { return false; }
+public:
+  static const bool value = test<T>(0);
+};
+
+// Test that T has on_destroy() member.
+template<typename T>
+struct has_on_destroy {
+private:
+  template<typename U>
+  static constexpr decltype(std::declval<U>().on_destroy(Entity()), true)
+  test(int) { return true; }
+
+  template<typename>
+  static constexpr bool test(...) { return false; }
+public:
+  static const bool value = test<T>(0);
+};
+
+template<typename T>
+std::enable_if_t<has_on_create<T>::value>
+invoke_on_create(const Entity& entity, T& component) {
+  component.on_create(entity);
+}
+
+template<typename T>
+std::enable_if_t<!has_on_create<T>::value>
+invoke_on_create(const Entity&, T&) {}
+
+template<typename T>
+std::enable_if_t<has_on_destroy<T>::value>
+invoke_on_destroy(const Entity& entity, T& component) {
+  component.on_destroy(entity);
+}
+
+template<typename T>
+std::enable_if_t<!has_on_destroy<T>::value>
+invoke_on_destroy(const Entity&, T&) {}
+} // namespace detail
 
 template<typename... Ts>
 inline EntityFilter<EntityView, Ts...> Container::entities() {
@@ -31,6 +81,7 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
 
   ComponentPtr<T> component(s, entity._index, entity._version);
+  detail::invoke_on_create(entity, *component);
   _event_manager.send(AfterCreate<T>{ entity, component });
 
   return component;
@@ -43,6 +94,7 @@ void Container::destroy_component(const Entity& entity) {
 
   ComponentPtr<T> component(s, entity._index, entity._version);
   _event_manager.send(BeforeDestroy<T>{ entity, component });
+  detail::invoke_on_destroy(entity, *component);
 
   s.erase(entity._index);
 

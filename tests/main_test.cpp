@@ -385,6 +385,24 @@ struct TestReceiver : public Receiver<AfterCreate<T>>
   }
 };
 
+struct FatComponent {
+  bool& created;
+  bool& destroyed;
+
+  FatComponent(bool& created, bool& destroyed)
+    : created(created)
+    , destroyed(destroyed)
+  {}
+
+  void on_create(const Entity&) {
+    created = true;
+  }
+
+  void on_destroy(const Entity&) {
+    destroyed = true;
+  }
+};
+
 TEST_CASE("Lifetime events") {
   Container container;
   TestReceiver<Position> subscriber;
@@ -403,6 +421,22 @@ TEST_CASE("Lifetime events") {
   e.destroy();
   CHECK(subscriber.created   == 1);
   CHECK(subscriber.destroyed == 1);
+}
+
+TEST_CASE("Lifetime callbacks") {
+  Container container;
+  auto e = container.create();
+
+  bool created   = false;
+  bool destroyed = false;
+
+  e.create_component<FatComponent>(created, destroyed);
+  CHECK( created);
+  CHECK(!destroyed);
+
+  e.destroy_component<FatComponent>();
+  CHECK(created);
+  CHECK(destroyed);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
