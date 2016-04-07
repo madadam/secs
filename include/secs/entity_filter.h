@@ -71,6 +71,25 @@ bool satisfies(const ComponentStores<Ts...>& stores, size_t index) {
   return SatisfiesAll<Ts...>()(stores, index);
 }
 
+template<typename C, typename E>
+struct GetComponent {
+  decltype(auto) operator () (const E& entity) const {
+    return *entity.template component<ComponentType<C>>();
+  }
+};
+
+template<typename C, typename E>
+struct GetComponent<Optional<C>, E> {
+  auto operator () (const E& entity) const {
+    return entity.template component<ComponentType<C>>().get();
+  }
+};
+
+template<typename C, typename E>
+decltype(auto) get_component(const E& entity) {
+  return GetComponent<C, E>()(entity);
+}
+
 } // namespace detail
 
 template<typename R> Container* get_container(const R&);
@@ -153,6 +172,13 @@ public:
 
   bool empty() const { return begin() == end(); }
   auto front() const { return *begin(); }
+
+  template<typename F>
+  void each(F&& f) const {
+    for (auto entity : *this) {
+      f(detail::get_component<Ts>(entity)...);
+    }
+  }
 
 private:
   static detail::ComponentStores<Ts...> store_ptrs(const Source& source) {

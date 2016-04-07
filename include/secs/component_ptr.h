@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cassert>
+#include <tuple>
 #include <utility>
 #include "secs/component_store.h"
 
 namespace secs {
-
 template<typename T>
 class ComponentPtr {
 public:

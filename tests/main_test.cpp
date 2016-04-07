@@ -202,6 +202,38 @@ TEST_CASE("Entity iterators traits") {
                      , FilteredEntity<Position>>::value));
 }
 
+TEST_CASE("Enumerate Entities using each") {
+  Container container;
+
+  auto e0 = container.create();
+  e0.create_component<Position>(0, 0);
+  e0.create_component<Velocity>();
+
+  auto e1 = container.create();
+  e1.create_component<Position>(0, 0);
+
+  auto counter = 0;
+  container.entities<Position>().each([&](auto&) {
+    ++counter;
+  });
+  CHECK(counter == 2);
+
+  counter = 0;
+  container.entities<Position, Velocity>().each([&](auto&, auto&) {
+    ++counter;
+  });
+  CHECK(counter == 1);
+
+  counter = 0;
+  auto counter_existing = 0;
+  container.entities<Position, Optional<Velocity>>().each([&](auto&, auto v) {
+    ++counter;
+    if (v) ++counter_existing;
+  });
+  CHECK(counter == 2);
+  CHECK(counter_existing == 1);
+}
+
 TEST_CASE("Create Components") {
   Container container;
   auto e = container.create();
