@@ -232,6 +232,12 @@ TEST_CASE("Enumerate Entities using each") {
   });
   CHECK(counter == 2);
   CHECK(counter_existing == 1);
+
+  counter = 0;
+  container.entities<Position, Velocity>().each([&](auto& entity, auto&, auto&) {
+    if (entity == e0) ++counter;
+  });
+  CHECK(counter == 1);
 }
 
 TEST_CASE("Create Components") {
@@ -419,6 +425,13 @@ TEST_CASE("Destroy Component") {
 
   CHECK(!e.component<Velocity>());
   CHECK( e.component<Position>());
+
+  SECTION("destroy is idempotent") {
+    e.destroy_component<Position>();
+    CHECK(!e.component<Position>());
+    e.destroy_component<Position>();
+    CHECK(!e.component<Position>());
+  }
 }
 
 TEST_CASE("Non-POD Components") {

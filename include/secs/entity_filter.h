@@ -19,6 +19,13 @@ template<typename T> struct ComponentTypeImpl<Required<T>> { using type = T; };
 template<typename T>
 using ComponentType = typename ComponentTypeImpl<T>::type;
 
+template<typename T> struct ComponentArgImpl              { using type = T&; };
+template<typename T> struct ComponentArgImpl<Optional<T>> { using type = T*; };
+template<typename T> struct ComponentArgImpl<Required<T>> { using type = T&; };
+
+template<typename T>
+using ComponentArg = typename ComponentArgImpl<T>::type;
+
 template<typename... Ts>
 using ComponentStores = std::tuple<ComponentStore<ComponentType<Ts>>*...>;
 
@@ -174,9 +181,20 @@ public:
   auto front() const { return *begin(); }
 
   template<typename F>
-  void each(F&& f) const {
+  std::enable_if_t<detail::IsCallable<F, detail::ComponentArg<Ts>...>>
+  each(F&& f) const {
     for (auto entity : *this) {
       f(detail::get_component<Ts>(entity)...);
+    }
+  }
+
+  template<typename F>
+  std::enable_if_t<detail::IsCallable<F,
+                                      const Entity&,
+                                      detail::ComponentArg<Ts>...>>
+  each(F&& f) const {
+    for (auto entity : *this) {
+      f(entity, detail::get_component<Ts>(entity)...);
     }
   }
 

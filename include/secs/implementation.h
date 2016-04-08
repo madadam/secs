@@ -89,6 +89,8 @@ ComponentPtr<T> Container::create_component( const Entity& entity
 template<typename T>
 void Container::destroy_component(const Entity& entity) {
   auto& s = store<T>();
+  if (!s.contains(entity._index)) return;
+
   ComponentPtr<T> component(s, entity._index, entity._version);
 
   _event_manager.send(BeforeDestroy<T>{ entity, component });
