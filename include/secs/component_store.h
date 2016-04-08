@@ -47,6 +47,28 @@ namespace detail {
                , count * sizeof(Store<T>));
   }
 
+  template<typename T, typename... Args>
+  std::enable_if_t<std::is_move_assignable<T>::value>
+  replace(T& dst, Args&&... args) {
+    dst = T(std::forward<Args>(args)...);
+  }
+
+  template<typename T, typename... Args>
+  std::enable_if_t<!std::is_move_assignable<T>::value &&
+                    std::is_copy_assignable<T>::value>
+  replace(T& dst, Args&&... args) {
+    T temp(std::forward<Args>(args)...);
+    dst = temp;
+  }
+
+  template<typename T, typename... Args>
+  std::enable_if_t<!std::is_move_assignable<T>::value &&
+                   !std::is_copy_assignable<T>::value>
+  replace(T& dst, Args&&... args) {
+    dst.~T();
+    new (&dst) T(std::forward<Args>(args)...);
+  }
+
 } // namespace detail
 
 template<typename T>
@@ -137,10 +159,10 @@ private:
     reserve_for(index);
 
     if (_versions[index].exists()) {
-      ptr(index)->~T();
+      detail::replace(*ptr(index), std::forward<Args>(args)...);
+    } else {
+      new (ptr(index)) T(std::forward<Args>(args)...);
     }
-
-    new (ptr(index)) T(std::forward<Args>(args)...);
 
     _versions[index] = version;
   }

@@ -72,15 +72,14 @@ template<typename T, typename... Args>
 ComponentPtr<T> Container::create_component( const Entity& entity
                                            , Args&&...     args)
 {
-  auto& s = store<T>();
-  assert(!s.contains(entity._index));
+  _ops.get<T>().template setup<T>();
 
   _event_manager.send(BeforeCreate<T>{ entity });
 
-  _ops.get<T>().template setup<T>();
+  auto& s = store<T>();
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
-
   ComponentPtr<T> component(s, entity._index, entity._version);
+
   detail::invoke_on_create(entity, *component);
   _event_manager.send(AfterCreate<T>{ entity, component });
 
@@ -90,9 +89,8 @@ ComponentPtr<T> Container::create_component( const Entity& entity
 template<typename T>
 void Container::destroy_component(const Entity& entity) {
   auto& s = store<T>();
-  assert(s.contains(entity._index, entity._version));
-
   ComponentPtr<T> component(s, entity._index, entity._version);
+
   _event_manager.send(BeforeDestroy<T>{ entity, component });
   detail::invoke_on_destroy(entity, *component);
 

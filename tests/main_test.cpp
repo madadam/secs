@@ -239,10 +239,77 @@ TEST_CASE("Create Components") {
   auto e = container.create();
   e.create_component<Position>();
   CHECK(e.component<Position>());
+}
 
-  auto c0 = e.create_component_unless_exists<Velocity>();
-  auto c1 = e.create_component_unless_exists<Velocity>();
+TEST_CASE("Ensure Component") {
+  Container container;
+  auto e = container.create();
+  auto c0 = e.ensure_component<Velocity>();
+  auto c1 = e.ensure_component<Velocity>();
   CHECK(c0 == c1);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+struct CopyAssignableComponent {
+  int value = 0;
+  bool assigned = false;
+
+  CopyAssignableComponent(int value) : value(value) {}
+  CopyAssignableComponent(const CopyAssignableComponent&) = delete;
+  CopyAssignableComponent(CopyAssignableComponent&&) = default;
+
+  CopyAssignableComponent& operator = (const CopyAssignableComponent& other) {
+    value = other.value;
+    assigned = true;
+    return *this;
+  }
+  CopyAssignableComponent& operator = (CopyAssignableComponent&&) = delete;
+};
+
+struct MoveAssignableComponent {
+  int value = 0;
+  bool assigned = false;
+
+  MoveAssignableComponent(int value) : value(value) {}
+  MoveAssignableComponent(const MoveAssignableComponent&) = delete;
+  MoveAssignableComponent(MoveAssignableComponent&&) = default;
+
+  MoveAssignableComponent& operator = (const MoveAssignableComponent&) = delete;
+  MoveAssignableComponent& operator = (MoveAssignableComponent&& other) {
+    value = other.value;
+    assigned = true;
+    return *this;
+  }
+};
+
+struct NonAssignableComponent {
+  int value = 0;
+  NonAssignableComponent(int value) : value(value) {}
+
+  NonAssignableComponent& operator = (const NonAssignableComponent&) = delete;
+  NonAssignableComponent& operator = (NonAssignableComponent&&) = delete;
+};
+
+TEST_CASE("Replace Component") {
+  Container container;
+
+  auto e = container.create();
+  auto c00 = e.create_component<NonAssignableComponent>(123);
+  auto c01 = e.create_component<NonAssignableComponent>(456);
+  CHECK(c00 == c01);
+  CHECK(c00->value == 456);
+
+  auto c10 = e.create_component<CopyAssignableComponent>(123);
+  auto c11 = e.create_component<CopyAssignableComponent>(456);
+  CHECK(c10 == c11);
+  CHECK(c10->value == 456);
+  CHECK(c10->assigned);
+
+  auto c20 = e.create_component<MoveAssignableComponent>(123);
+  auto c21 = e.create_component<MoveAssignableComponent>(456);
+  CHECK(c20 == c21);
+  CHECK(c20->value == 456);
+  CHECK(c20->assigned);
 }
 
 TEST_CASE("Copy Component in the same Container") {
