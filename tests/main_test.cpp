@@ -291,6 +291,7 @@ struct MoveAssignableComponent {
 struct NonAssignableComponent {
   int value = 0;
   NonAssignableComponent(int value) : value(value) {}
+  NonAssignableComponent(NonAssignableComponent&&) = default;
 
   NonAssignableComponent& operator = (const NonAssignableComponent&) = delete;
   NonAssignableComponent& operator = (NonAssignableComponent&&) = delete;
@@ -449,27 +450,11 @@ TEST_CASE("Non-POD Components") {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-template<typename T>
-struct TestReceiver : public Receiver<AfterCreate<T>>
-                    , public Receiver<AfterDestroy<T>>
-{
-  size_t created   = 0;
-  size_t destroyed = 0;
-
-  void receive(const AfterCreate<T>&) override {
-    ++created;
-  }
-
-  void receive(const AfterDestroy<T>&) override {
-    ++destroyed;
-  }
-};
-
-struct FatComponent {
+struct ComponentWithCallbacks {
   bool& created;
   bool& destroyed;
 
-  FatComponent(bool& created, bool& destroyed)
+  ComponentWithCallbacks(bool& created, bool& destroyed)
     : created(created)
     , destroyed(destroyed)
   {}
@@ -483,26 +468,6 @@ struct FatComponent {
   }
 };
 
-TEST_CASE("Lifetime events") {
-  Container container;
-  TestReceiver<Position> subscriber;
-
-  container.subscribe<AfterCreate<Position>>(subscriber);
-  container.subscribe<AfterDestroy<Position>>(subscriber);
-
-  CHECK(subscriber.created   == 0);
-  CHECK(subscriber.destroyed == 0);
-
-  auto e = container.create();
-  e.create_component<Position>(123, 456);
-  CHECK(subscriber.created   == 1);
-  CHECK(subscriber.destroyed == 0);
-
-  e.destroy();
-  CHECK(subscriber.created   == 1);
-  CHECK(subscriber.destroyed == 1);
-}
-
 TEST_CASE("Lifetime callbacks") {
   Container container;
   auto e = container.create();
@@ -510,13 +475,106 @@ TEST_CASE("Lifetime callbacks") {
   bool created   = false;
   bool destroyed = false;
 
-  e.create_component<FatComponent>(created, destroyed);
+  e.create_component<ComponentWithCallbacks>(created, destroyed);
   CHECK( created);
   CHECK(!destroyed);
 
-  e.destroy_component<FatComponent>();
+  e.destroy_component<ComponentWithCallbacks>();
   CHECK(created);
   CHECK(destroyed);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+TEST_CASE("Lifetime signals") {
+  Container container;
+
+  SECTION("per Container") {
+    size_t create_count  = 0;
+    size_t destroy_count = 0;
+
+    container.connect<OnCreate<Position>> ([&](auto&) { ++create_count;  });
+    container.connect<OnDestroy<Position>>([&](auto&) { ++destroy_count; });
+
+    auto e0 = container.create();
+    auto e1 = container.create();
+    CHECK(create_count  == 0);
+    CHECK(destroy_count == 0);
+
+    e0.create_component<Position>(0, 0);
+    CHECK(create_count  == 1);
+    CHECK(destroy_count == 0);
+
+    e1.create_component<Position>(0, 0);
+    CHECK(create_count  == 2);
+    CHECK(destroy_count == 0);
+
+    e0.destroy_component<Position>();
+    e1.destroy_component<Position>();
+    CHECK(create_count  == 2);
+    CHECK(destroy_count == 2);
+  }
+
+  SECTION("per Entity") {
+    size_t e0_create_count  = 0;
+    size_t e0_destroy_count = 0;
+
+    size_t e1_create_count  = 0;
+    size_t e1_destroy_count = 0;
+
+    auto e0 = container.create();
+    auto e1 = container.create();
+
+    e0.connect<OnCreate<Position>> ([&](auto&) { ++e0_create_count;  });
+    e0.connect<OnDestroy<Position>>([&](auto&) { ++e0_destroy_count; });
+    e1.connect<OnCreate<Position>> ([&](auto&) { ++e1_create_count;  });
+    e1.connect<OnDestroy<Position>>([&](auto&) { ++e1_destroy_count; });
+
+    CHECK(e0_create_count  == 0);
+    CHECK(e0_destroy_count == 0);
+    CHECK(e1_create_count  == 0);
+    CHECK(e1_destroy_count == 0);
+
+    e0.create_component<Position>(0, 0);
+    CHECK(e0_create_count  == 1);
+    CHECK(e0_destroy_count == 0);
+    CHECK(e1_create_count  == 0);
+    CHECK(e1_destroy_count == 0);
+
+    e1.create_component<Position>(0, 0);
+    CHECK(e0_create_count  == 1);
+    CHECK(e0_destroy_count == 0);
+    CHECK(e1_create_count  == 1);
+    CHECK(e1_destroy_count == 0);
+
+    e0.destroy_component<Position>();
+    CHECK(e0_create_count  == 1);
+    CHECK(e0_destroy_count == 1);
+    CHECK(e1_create_count  == 1);
+    CHECK(e1_destroy_count == 0);
+
+    e1.destroy_component<Position>();
+    CHECK(e0_create_count  == 1);
+    CHECK(e0_destroy_count == 1);
+    CHECK(e1_create_count  == 1);
+    CHECK(e1_destroy_count == 1);
+  }
+}
+
+TEST_CASE("Per Entity signals are disconnected when Entity is destroyed") {
+  Container container;
+  size_t count = 0;
+
+  auto e0 = container.create();
+  e0.connect<OnCreate<Velocity>>([&](auto&) { ++count; });
+
+  e0.create_component<Velocity>();
+  CHECK(count == 1);
+
+  e0.destroy();
+
+  auto e1 = container.create(); // Will be allocated in the same slot as e0.
+  e1.create_component<Velocity>();
+  CHECK(count == 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -533,4 +591,3 @@ TEST_CASE("FilteredEntity conversions") {
 
   unused(e1, e2, e3);
 }
-

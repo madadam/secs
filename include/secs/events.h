@@ -5,26 +5,16 @@
 
 namespace secs {
 
-template<typename T>
-struct BeforeCreate {
-  const Entity entity;
-};
-
-template<typename T>
-struct AfterCreate {
+// Event emitted after a Component of type T is created.
+template<typename T> struct OnCreate {
   const Entity          entity;
   const ComponentPtr<T> component;
 };
 
-template<typename T>
-struct BeforeDestroy {
+// Event emitted before a Component of type T is destroyed.
+template<typename T> struct OnDestroy {
   const Entity          entity;
   const ComponentPtr<T> component;
 };
 
-template<typename T>
-struct AfterDestroy {
-  const Entity entity;
-};
-
-}
+} // namespace secs

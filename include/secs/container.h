@@ -5,8 +5,9 @@
 
 #include "secs/component_ops.h"
 #include "secs/component_store.h"
-#include "secs/event_manager.h"
+#include "secs/detail.h"
 #include "secs/omniset.h"
+#include "secs/signal.h"
 #include "secs/type_keyed_map.h"
 #include "secs/version.h"
 
@@ -37,35 +38,41 @@ public:
 
   Entity get(size_t index);
 
-  template<typename E> void subscribe(Receiver<E>& receiver) {
-    _event_manager.subscribe<E>(receiver);
+  // Connect handler to be called when Event of type E is emitted.
+  template<typename E, typename F>
+  std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
+  connect(F&& f) {
+    return _signals.get<Signal<const E&>>().connect(std::forward<F>(f));
   }
 
-  template<typename E> void unsubscribe(Receiver<E>& receiver) {
-    _event_manager.unsubscribe<E>(receiver);
-  }
-
-  template<typename E> void send(const E& event) {
-    _event_manager.send(event);
+  template<typename E>
+  void emit(const E& event) const {
+    _signals.get<Signal<const E&>>()(event);
   }
 
 private:
+  // Entity metadata.
+  struct Meta {
+    Version version;
+    Omniset signals;
+  };
+
   size_t capacity() const {
     return _capacity;
   }
 
   Version get_version(size_t index) const {
-    return index < _versions.size() ? _versions[index] : Version{};
+    return index < _meta.size() ? _meta[index].version : Version{};
   }
 
   bool contains(size_t index) const {
-    return index < _versions.size() && _versions[index].exists();
+    return index < _meta.size() && _meta[index].version.exists();
   }
 
   bool contains(size_t index, Version version) const {
-    return index < _versions.size()
-        && _versions[index].exists()
-        && _versions[index] == version;
+    return index < _meta.size()
+        && _meta[index].version.exists()
+        && _meta[index].version == version;
   }
 
   template<typename T>
@@ -84,22 +91,23 @@ private:
   template<typename T>
   void destroy_component(const Entity&);
 
-  template<typename T>
-  ComponentPtr<T> create_component_unless_exists();
-
-  template<typename T>
-  void destroy_component_if_exists();
-
   void copy(const Entity& source, const Entity& target);
+
+  template<typename E, typename F>
+  std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
+  connect(const Entity&, F&&);
+
+  template<typename E>
+  void emit(const Entity&, const E&) const;
 
 private:
 
   size_t                      _capacity = 0;
   std::vector<size_t>         _holes;
-  std::vector<Version>        _versions;
+  std::vector<Meta>           _meta;
 
-  EventManager                _event_manager;
   Omniset                     _stores;
+  Omniset                     _signals;
   TypeKeyedMap<ComponentOps>  _ops;
 
   friend class Entity;

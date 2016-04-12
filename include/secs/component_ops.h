@@ -6,11 +6,6 @@ class Entity;
 
 class ComponentOps {
 public:
-  ComponentOps()
-    : _copy(&copy_noop)
-    , _destroy(&destroy_noop)
-  {}
-
   template<typename T>
   void setup() {
     _copy    = &copy<T>;
@@ -18,7 +13,7 @@ public:
   }
 
   explicit operator bool () const {
-    return _destroy != &destroy_noop;
+    return _destroy != &noop1;
   }
 
   void copy(const Entity& source, const Entity& target) {
@@ -43,16 +38,16 @@ private:
 
   template<typename T> static void destroy(const Entity&);
 
-  static void copy_noop(const Entity&, const Entity&) {}
-  static void destroy_noop(const Entity&) {}
+  static void noop2(const Entity&, const Entity&) {}
+  static void noop1(const Entity&) {}
 
 private:
 
-  using Copy     = void (*)(const Entity&, const Entity&);
-  using Destroy  = void (*)(const Entity&);
+  using Fun2 = void (*)(const Entity&, const Entity&);
+  using Fun1 = void (*)(const Entity&);
 
-  Copy    _copy    = nullptr;
-  Destroy _destroy = nullptr;
+  Fun2 _copy    = &noop2;
+  Fun1 _destroy = &noop1;
 };
 
 } // namespace secs
