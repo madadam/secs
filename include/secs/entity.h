@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <utility>
 
-#include "secs/detail.h"
 #include "secs/signal.h"
 #include "secs/version.h"
 
@@ -57,15 +56,6 @@ public:
 
   Entity copy_to(Container&) const;
   void destroy() const;
-
-  // Connect handler to be called when Event of type E is emitted.
-  template<typename E, typename F>
-  std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
-  connect(F&&);
-
-  // Emit event.
-  template<typename E>
-  void emit(const E&) const;
 
 private:
   Entity(Container& container, size_t index, Version version)

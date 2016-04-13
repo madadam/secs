@@ -2,6 +2,7 @@
 
 #include "secs/component_ptr.h"
 #include "secs/entity.h"
+#include "secs/functional.h"
 
 namespace secs {
 

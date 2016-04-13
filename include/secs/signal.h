@@ -6,36 +6,19 @@
 #include <functional>
 #include <vector>
 
-namespace secs {
-template<typename...> class ScopedConnection;
-template<typename...> class Signal;
+#include "secs/functional.h"
 
-template<typename... Args>
+namespace secs {
+
+class ScopedConnection;
+template<typename> class Signal;
+
 class Connection {
 public:
   Connection() = default;
 
-  Connection(Connection&& other) noexcept
-    : _signal(other._signal)
-    , _index(other._index)
-  {
-    if (_signal) {
-      _signal->_slots[_index].connection = this;
-      other._signal = nullptr;
-    }
-  }
-
-  Connection& operator = (Connection&& other) noexcept {
-    _signal = other._signal;
-    _index  = other._index;
-
-    if (_signal) {
-      _signal->_slots[_index].connection = this;
-      other._signal = nullptr;
-    }
-
-    return *this;
-  }
+  Connection(Connection&&) noexcept;
+  Connection& operator = (Connection&& other) noexcept;
 
   Connection(const Connection&) = delete;
   Connection& operator = (const Connection&) = delete;
@@ -44,35 +27,109 @@ public:
     return _signal != nullptr;
   }
 
-  void disconnect() {
-    if (!_signal) return;
-
-    _signal->disconnect(_index);
-    _signal = nullptr;
-  }
+  void disconnect();
 
   // Convert this connecion to ScopedConnection,
-  ScopedConnection<Args...> scoped() && {
-    return { std::move(*this) };
+  ScopedConnection scoped() &&;
+
+private:
+  using DisconnectFun = void (*)(void*, size_t);
+
+  template<typename T>
+  static void disconnect(void* signal, size_t index) {
+    reinterpret_cast<Signal<T>*>(signal)->disconnect(index);
   }
 
 private:
-  Connection(Signal<Args...>* signal, size_t index)
+  template<typename T>
+  Connection(Signal<T>* signal, size_t index)
     : _signal(signal)
     , _index(index)
+    , _disconnect(&disconnect<T>)
   {}
 
-  Signal<Args...>* _signal = nullptr;
-  size_t           _index  = 0;
+  void*         _signal = nullptr;
+  size_t        _index  = 0;
+  DisconnectFun _disconnect = nullptr;
 
-  template<typename...> friend class Signal;
+  template<typename> friend class Signal;
 };
 
-template<typename... Args>
+template<typename T>
+class Signal {
+  static_assert(!std::is_reference<T>::value, "T cannot be reference");
+
+public:
+  Signal() = default;
+  Signal(const Signal&) = delete;
+  Signal(Signal&&) = delete;
+
+  ~Signal() {
+    disconnect_all();
+  }
+
+  Signal& operator = (const Signal&) = delete;
+  Signal& operator = (Signal&&) = delete;
+
+  template<typename F>
+  Connection connect(F&& fun);
+
+  void disconnect_all() {
+    _slots.clear();
+    _holes.clear();
+  }
+
+  void operator () (const T& event) const {
+    for (auto& slot : _slots) {
+      if (slot) slot(event);
+    }
+  }
+
+private:
+  size_t reserve() {
+    if (_holes.empty()) {
+      _slots.resize(_slots.size() + 1);
+      return _slots.size() - 1;
+    } else {
+      auto index = _holes.back();
+      _holes.pop_back();
+      return index;
+    }
+  }
+
+  void disconnect(size_t index) {
+    assert(index < _slots.size());
+    assert(_slots[index]);
+
+    _slots[index] = nullptr;
+    _holes.push_back(index);
+  }
+
+private:
+  std::vector<std::function<void(const T&)>> _slots;
+  std::vector<size_t>                        _holes;
+
+  friend class Connection;
+};
+
+template<typename F, typename T>
+std::result_of_t<F(const T&)> invoke(F fun, const T& event) {
+  return fun(event);
+}
+
+template<typename F, typename T>
+std::result_of_t<F()> invoke(F fun, const T&) {
+  return fun();
+}
+
+// Guard class that automatically disconnects the associated connection when it
+// goes out of scope.
+//
+// Warning: make sure this class never outlives the Signal its connected to.
 class ScopedConnection {
 public:
   ScopedConnection() = default;
-  ScopedConnection(Connection<Args...>&& connection)
+  ScopedConnection(Connection&& connection)
     : _connection(std::move(connection))
   {}
 
@@ -81,97 +138,31 @@ public:
   ScopedConnection(ScopedConnection&&) = default;
   ScopedConnection& operator = (ScopedConnection&&) = default;
 
-  bool connected() const { return _connection.connection(); }
-  void disconnect() {  _connection.disconnect(); }
+  ScopedConnection& operator = (Connection&& connection) {
+    _connection = std::move(connection);
+    return *this;
+  }
+
+  bool connected() const { return _connection.connected(); }
+  void disconnect() { _connection.disconnect(); }
 
 private:
-  Connection<Args...> _connection;
+  Connection _connection;
 };
 
-template<typename... Args>
-class Signal {
-private:
-  struct Slot {
-    std::function<void(Args...)> function;
-    Connection<Args...>*         connection = nullptr;
-  };
-
-public:
-  Signal() = default;
-
-  Signal(Signal&& other)
-    : _slots(std::move(other._slots))
-    , _holes(std::move(other._holes))
-  {
-    for (auto& slot : _slots) {
-      if (slot.connection) {
-        slot.connection->_signal = this;
-      }
-    }
-  }
-
-  ~Signal() {
-    disconnect_all();
-  }
-
-  Signal(const Signal&) = delete;
-  Signal& operator = (const Signal&) = delete;
-
-  Connection<Args...> connect(std::function<void(Args...)> fun) {
-    if (_holes.empty()) {
-      auto index = _slots.size();
-      Connection<Args...> connection(this, index);
-      _slots.push_back({ std::move(fun), &connection });
-
-      return connection;
-    } else {
-      auto index = _holes.back();
-      _holes.pop_back();
-      Connection<Args...> connection(this, index);
-      _slots[index].function   = std::move(fun);
-      _slots[index].connection = &connection;
-
-      return connection;
-    }
-  }
-
-  void disconnect_all() {
-    for (auto& slot : _slots) {
-      if (slot.connection) {
-        slot.connection->_signal = nullptr;
-        slot.connection = nullptr;
-      }
-
-      slot.function = nullptr;
-    }
-
-    _holes.clear();
-  }
-
-  void operator () (Args&&... args) const {
-    for (auto& slot : _slots) {
-      if (slot.function) {
-        slot.function(std::forward<Args>(args)...);
-      }
-    }
-  }
-
-private:
-  void disconnect(size_t index) {
-    assert(index >= 0 && index < _slots.size());
-    assert(_slots[index].function);
-
-    _slots[index].function   = nullptr;
-    _slots[index].connection = nullptr;
-
-    _holes.push_back(index);
-  }
-
-private:
-  std::vector<Slot>   _slots;
-  std::vector<size_t> _holes;
-
-  template<typename...> friend class Connection;
-};
+inline ScopedConnection Connection::scoped() && {
+  return { std::move(*this) };
+}
 
 } // namespace secs
+
+template<typename T> template<typename F>
+secs::Connection secs::Signal<T>::connect(F&& fun) {
+  using secs::invoke;
+
+  auto index = reserve();
+  _slots[index] = [fun = std::forward<F>(fun)](const T& event) {
+    invoke(fun, event);
+  };
+  return Connection(this, index);
+}

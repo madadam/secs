@@ -5,7 +5,7 @@
 
 #include "secs/component_ops.h"
 #include "secs/component_store.h"
-#include "secs/detail.h"
+#include "secs/event_traits.h"
 #include "secs/omniset.h"
 #include "secs/signal.h"
 #include "secs/type_keyed_map.h"
@@ -40,39 +40,36 @@ public:
 
   // Connect handler to be called when Event of type E is emitted.
   template<typename E, typename F>
-  std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
-  connect(F&& f) {
-    return _signals.get<Signal<const E&>>().connect(std::forward<F>(f));
+  auto connect(F&& f) {
+    return _signals.get<Signal<E>>().connect(std::forward<F>(f));
   }
+
+  template<typename E, typename T>
+  std::enable_if_t<CanHandleEvent<T, E>, Connection>
+  connect();
 
   template<typename E>
   void emit(const E& event) const {
-    _signals.get<Signal<const E&>>()(event);
+    _signals.get<Signal<E>>()(event);
   }
 
 private:
-  // Entity metadata.
-  struct Meta {
-    Version version;
-    Omniset signals;
-  };
-
   size_t capacity() const {
     return _capacity;
   }
 
   Version get_version(size_t index) const {
-    return index < _meta.size() ? _meta[index].version : Version{};
+    return index < _versions.size() ? _versions[index] : Version{};
   }
 
   bool contains(size_t index) const {
-    return index < _meta.size() && _meta[index].version.exists();
+    return index < _versions.size() && _versions[index].exists();
   }
 
   bool contains(size_t index, Version version) const {
-    return index < _meta.size()
-        && _meta[index].version.exists()
-        && _meta[index].version == version;
+    return index < _versions.size()
+        && _versions[index].exists()
+        && _versions[index] == version;
   }
 
   template<typename T>
@@ -93,22 +90,15 @@ private:
 
   void copy(const Entity& source, const Entity& target);
 
-  template<typename E, typename F>
-  std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
-  connect(const Entity&, F&&);
-
-  template<typename E>
-  void emit(const Entity&, const E&) const;
-
 private:
-
   size_t                      _capacity = 0;
   std::vector<size_t>         _holes;
-  std::vector<Meta>           _meta;
+  std::vector<Version>        _versions;
 
   Omniset                     _stores;
-  Omniset                     _signals;
   TypeKeyedMap<ComponentOps>  _ops;
+
+  Omniset                     _signals;
 
   friend class Entity;
   template<typename, typename...> friend class EntityFilter;

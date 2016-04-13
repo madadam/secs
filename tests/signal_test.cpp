@@ -4,74 +4,93 @@
 using secs::Connection;
 using secs::Signal;
 
+namespace {
+
+struct TestEvent {
+  int a = 0;
+  int b = 0;
+  TestEvent() = default;
+};
+
+template<typename F>
+std::result_of_t<F(int, int)> invoke(F fun, const TestEvent& event) {
+  return fun(event.a, event.b);
+}
+
+}
+
 TEST_CASE("Signal basics") {
-  Signal<> signal0;
+  Signal<TestEvent> signal0;
   bool slot0_called = false;
 
-  signal0.connect([&]() { slot0_called = true; });
-  signal0();
+  signal0.connect([&](auto) { slot0_called = true; });
+  signal0(TestEvent{});
   CHECK(slot0_called);
 
-  Signal<int> signal1;
+  Signal<TestEvent> signal1;
   int slot1_called_with = 0;
 
-  signal1.connect([&](int arg) { slot1_called_with = arg; });
-  signal1(123);
+  signal1.connect([&](auto e) { slot1_called_with = e.a; });
+  signal1(TestEvent{ 123, 456 });
   CHECK(slot1_called_with == 123);
 }
 
 TEST_CASE("Signal disconnection") {
-  Signal<> signal;
+  Signal<TestEvent> signal;
   auto count0 = 0;
   auto count1 = 0;
 
-  SECTION("Manual") {
-    auto conn0 = signal.connect([&]() { ++count0; });
-    auto conn1 = signal.connect([&]() { ++count1; });
+  SECTION("manual") {
+    auto conn0 = signal.connect([&](auto) { ++count0; });
+    auto conn1 = signal.connect([&](auto) { ++count1; });
     CHECK(conn0.connected());
     CHECK(conn1.connected());
 
-    signal();
+    signal(TestEvent{});
     CHECK(count0 == 1);
     CHECK(count1 == 1);
 
     conn0.disconnect();
-    CHECK(!conn0.connected());
-    CHECK( conn1.connected());
+    CHECK_FALSE(conn0.connected());
+    CHECK(conn1.connected());
 
-    signal();
+    signal(TestEvent{});
     CHECK(count0 == 1);
     CHECK(count1 == 2);
 
     conn1.disconnect();
-    CHECK(!conn0.connected());
-    CHECK(!conn1.connected());
+    CHECK_FALSE(conn0.connected());
+    CHECK_FALSE(conn1.connected());
 
-    signal();
+    signal(TestEvent{});
     CHECK(count0 == 1);
     CHECK(count1 == 2);
   }
 
-  SECTION("Scoped") {
+  SECTION("scoped") {
     {
-      auto conn = signal.connect([&]() { ++count0; }).scoped();
-      signal();
+      auto conn = signal.connect([&](auto) { ++count0; }).scoped();
+      signal(TestEvent{});
       CHECK(count0 == 1);
     }
 
-    signal();
+    signal(TestEvent{});
     CHECK(count0 == 1);
   }
 }
 
-TEST_CASE("Signal destruction") {
-  Connection<> connection;
+TEST_CASE("Signal invocation") {
+  Signal<TestEvent> signal;
+  size_t count = 0;
 
-  {
-    Signal<> signal;
-    connection = signal.connect([&](){});
-    CHECK(connection.connected());
-  }
+  signal.connect([&](const TestEvent&) { ++count; });
+  signal.connect([&](TestEvent)        { ++count; });
+  signal.connect([&](auto)             { ++count; });
+  signal.connect([&](auto&)            { ++count; });
+  signal.connect([&]()                 { ++count; });
+  signal.connect([&](int, int)         { ++count; });
 
-  CHECK(!connection.connected());
+  signal(TestEvent{});
+
+  CHECK(count == 6);
 }

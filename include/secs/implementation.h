@@ -5,14 +5,14 @@
 #include "secs/entity.h"
 #include "secs/entity_filter.h"
 #include "secs/entity_view.h"
-#include "secs/events.h"
+#include "secs/lifetime_events.h"
 
 namespace secs {
 namespace detail {
 
 // Test that T has on_create() member.
 template<typename T>
-struct has_on_create {
+struct HasOnCreate {
 private:
   template<typename U>
   static constexpr decltype(std::declval<U>().on_create(Entity()), true)
@@ -26,7 +26,7 @@ public:
 
 // Test that T has on_destroy() member.
 template<typename T>
-struct has_on_destroy {
+struct HasOnDestroy {
 private:
   template<typename U>
   static constexpr decltype(std::declval<U>().on_destroy(Entity()), true)
@@ -38,39 +38,27 @@ public:
   static const bool value = test<T>(0);
 };
 
-// Test that T has on_change() member.
 template<typename T>
-struct has_on_change {
-private:
-  template<typename U>
-  static constexpr decltype(std::declval<U>().on_change(Entity()), true)
-  test(int) { return true; }
-
-  template<typename>
-  static constexpr bool test(...) { return false; }
-public:
-  static const bool value = test<T>(0);
-};
-
-template<typename T>
-std::enable_if_t<has_on_create<T>::value>
+std::enable_if_t<HasOnCreate<T>::value>
 invoke_on_create(const Entity& entity, T& component) {
   component.on_create(entity);
 }
 
 template<typename T>
-std::enable_if_t<!has_on_create<T>::value>
+std::enable_if_t<!HasOnCreate<T>::value>
 invoke_on_create(const Entity&, T&) {}
 
 template<typename T>
-std::enable_if_t<has_on_destroy<T>::value>
+std::enable_if_t<HasOnDestroy<T>::value>
 invoke_on_destroy(const Entity& entity, T& component) {
   component.on_destroy(entity);
 }
 
 template<typename T>
-std::enable_if_t<!has_on_destroy<T>::value>
+std::enable_if_t<!HasOnDestroy<T>::value>
 invoke_on_destroy(const Entity&, T&) {}
+
+// template<typename T, typename E>
 
 } // namespace detail
 
@@ -93,12 +81,8 @@ ComponentPtr<T> Container::create_component( const Entity& entity
   s.emplace(entity._index, entity._version, std::forward<Args>(args)...);
 
   ComponentPtr<T> component(s, entity._index, entity._version);
-
   detail::invoke_on_create(entity, *component);
-
-  OnCreate<T> event{ entity, component };
-  emit(entity, event);
-  emit(event);
+  emit(OnCreate<T>{ entity, component });
 
   return component;
 }
@@ -109,28 +93,10 @@ void Container::destroy_component(const Entity& entity) {
   if (!s.contains(entity._index)) return;
 
   ComponentPtr<T> component(s, entity._index, entity._version);
-
   detail::invoke_on_destroy(entity, *component);
-
-  OnDestroy<T> event{ entity, component };
-  emit(entity, event);
-  emit(event);
+  emit(OnDestroy<T>{ entity, component });
 
   s.erase(entity._index);
-}
-
-template<typename E, typename F>
-std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
-Container::connect(const Entity& entity, F&& f) {
-  assert(contains(entity._index));
-  return _meta[entity._index].signals.get<Signal<const E&>>()
-                                     .connect(std::forward<F>(f));
-}
-
-template<typename E>
-void Container::emit(const Entity& entity, const E& event) const {
-  assert(contains(entity._index));
-  _meta[entity._index].signals.get<Signal<const E&>>()(event);
 }
 
 // ComponentOps implementation
@@ -178,15 +144,17 @@ void Entity::destroy_component() const {
   _container->destroy_component<T>(*this);
 }
 
-template<typename E, typename F>
-std::enable_if_t<detail::IsCallable<F, E&>, Connection<const E&>>
-Entity::connect(F&& f) {
-  return _container->connect<E>(*this, std::forward<F>(f));
-}
-
-template<typename E>
-void Entity::emit(const E& event) const {
-  _container->emit(*this, event);
-}
-
 } // namespace secs
+
+template<typename E, typename T>
+std::enable_if_t<secs::CanHandleEvent<T, E>, secs::Connection>
+secs::Container::connect() {
+  using secs::event_entity;
+  using secs::event_handle;
+
+  return connect<E>([](auto& event) {
+    if (auto component = event_entity(event).template component<T>()) {
+      event_handle(*component, event);
+    }
+  });
+}

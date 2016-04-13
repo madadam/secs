@@ -1,7 +1,7 @@
 #pragma once
 
-#include "secs/detail.h"
 #include "secs/filtered_entity.h"
+#include "secs/functional.h"
 
 namespace secs {
 
@@ -181,7 +181,7 @@ public:
   auto front() const { return *begin(); }
 
   template<typename F>
-  std::enable_if_t<detail::IsCallable<F, detail::ComponentArg<Ts>...>>
+  std::enable_if_t<IsCallable<F, detail::ComponentArg<Ts>...>>
   each(F&& f) const {
     for (auto entity : *this) {
       f(detail::get_component<Ts>(entity)...);
@@ -189,9 +189,7 @@ public:
   }
 
   template<typename F>
-  std::enable_if_t<detail::IsCallable<F,
-                                      const Entity&,
-                                      detail::ComponentArg<Ts>...>>
+  std::enable_if_t<IsCallable<F, const Entity&, detail::ComponentArg<Ts>...>>
   each(F&& f) const {
     for (auto entity : *this) {
       f(entity, detail::get_component<Ts>(entity)...);
