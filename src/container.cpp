@@ -1,4 +1,6 @@
 #include "secs/container.h"
+#include "secs/entity_filter.h"
+#include "secs/entity_view.h"
 
 using namespace secs;
 

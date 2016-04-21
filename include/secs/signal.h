@@ -125,7 +125,7 @@ std::result_of_t<F()> invoke(F fun, const T&) {
 // Guard class that automatically disconnects the associated connection when it
 // goes out of scope.
 //
-// Warning: make sure this class never outlives the Signal its connected to.
+// Warning: make sure this class never outlives the Signal it's connected to.
 class ScopedConnection {
 public:
   ScopedConnection() = default;

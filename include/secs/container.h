@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cassert>
+#include <cstddef>
 #include <vector>
 
 #include "secs/component_ops.h"
 #include "secs/component_store.h"
+#include "secs/dynamic_tuple.h"
 #include "secs/event_traits.h"
-#include "secs/omniset.h"
 #include "secs/signal.h"
 #include "secs/type_keyed_map.h"
 #include "secs/version.h"
@@ -16,7 +16,6 @@ template<typename> class ComponentPtr;
 class Entity;
 template<typename, typename...> class EntityFilter;
 class EntityView;
-template<typename> class Receiver;
 
 class Container {
 public:
@@ -95,10 +94,10 @@ private:
   std::vector<size_t>         _holes;
   std::vector<Version>        _versions;
 
-  Omniset                     _stores;
+  DynamicTuple                _stores;
   TypeKeyedMap<ComponentOps>  _ops;
 
-  Omniset                     _signals;
+  DynamicTuple                _signals;
 
   friend class Entity;
   template<typename, typename...> friend class EntityFilter;
@@ -106,5 +105,3 @@ private:
 };
 
 } // namespace secs
-
-#include "implementation.h"

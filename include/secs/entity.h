@@ -4,13 +4,11 @@
 #include <cstdint>
 #include <utility>
 
-#include "secs/signal.h"
 #include "secs/version.h"
 
 namespace secs {
 
 template<typename> class ComponentPtr;
-template<typename> class ComponentStore;
 class Container;
 template<typename...> class FilteredEntity;
 
@@ -32,7 +30,8 @@ public:
   // Component constructor.
   // If a component of the same type already exists, it will be replaced.
   template<typename T, typename... Args>
-  ComponentPtr<T> create_component(Args&&... args) const;
+  std::enable_if_t<std::is_constructible<T, Args...>::value, ComponentPtr<T>>
+  create_component(Args&&... args) const;
 
   // Creates a Component of the given type unless one already exists.
   template<typename T> ComponentPtr<T> ensure_component() const {
@@ -80,5 +79,3 @@ private:
 inline bool operator != (const Entity& a, const Entity& b) { return !(a == b); }
 
 } // namespace secs
-
-#include "implementation.h"

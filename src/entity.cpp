@@ -1,4 +1,5 @@
 #include <cassert>
+#include "secs/container.h"
 #include "secs/entity.h"
 
 using namespace secs;

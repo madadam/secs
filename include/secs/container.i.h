@@ -1,8 +1,7 @@
 #pragma once
 
-#include "secs/component_ptr.h"
-#include "secs/container.h"
 #include "secs/entity.h"
+#include "secs/container.h"
 #include "secs/entity_filter.h"
 #include "secs/entity_view.h"
 #include "secs/lifetime_events.h"
@@ -58,8 +57,6 @@ template<typename T>
 std::enable_if_t<!HasOnDestroy<T>::value>
 invoke_on_destroy(const Entity&, T&) {}
 
-// template<typename T, typename E>
-
 } // namespace detail
 
 template<typename... Ts>
@@ -97,51 +94,6 @@ void Container::destroy_component(const Entity& entity) {
   emit(OnDestroy<T>{ entity, component });
 
   s.erase(entity._index);
-}
-
-// ComponentOps implementation
-template<typename T>
-std::enable_if_t<std::is_copy_constructible<T>::value, void>
-ComponentOps::copy(const Entity& source, const Entity& target) {
-  if (auto sc = source.component<T>()) {
-    target.create_component<T>(*sc);
-  }
-}
-
-template<typename T>
-std::enable_if_t<!std::is_copy_constructible<T>::value, void>
-ComponentOps::copy(const Entity& source, const Entity&) {
-  assert(!source.component<T>());
-}
-
-template<typename T>
-void ComponentOps::destroy(const Entity& entity) {
-  entity.destroy_component<T>();
-}
-
-// Entity implementation
-template<typename... Ts>
-Entity::Entity(const FilteredEntity<Ts...>& other)
-  : Entity(other._entity)
-{}
-
-template<typename T>
-ComponentPtr<T> Entity::component() const {
-  assert(*this);
-  return { _container->store<T>(), _index, _version };
-}
-
-template<typename T, typename... Args>
-ComponentPtr<T> Entity::create_component(Args&&... args) const {
-  static_assert(std::is_constructible<T, Args...>::value, "T is not constructible from Args");
-  assert(*this);
-  return _container->create_component<T>(*this, std::forward<Args>(args)...);
-}
-
-template<typename T>
-void Entity::destroy_component() const {
-  assert(*this);
-  _container->destroy_component<T>(*this);
 }
 
 } // namespace secs

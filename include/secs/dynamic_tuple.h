@@ -4,12 +4,12 @@
 #include "secs/any.h"
 #include "secs/type_indexer.h"
 
-// Container that contains one instance of every default-constructible type
-// in the universe.
+// Tuple with dynamic number of elements. Can contain at most one element per
+// type. The types stored in it must be default-constructible.
 
 namespace secs {
 
-class Omniset {
+class DynamicTuple {
 public:
   template<typename T>
   T& get() const {

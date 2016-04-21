@@ -224,9 +224,12 @@ Container* get_container(const R& range) {
   }
 }
 
-template<typename... Ts>
-auto filter(const std::vector<Entity>& entities) {
-  return EntityFilter<const std::vector<Entity>&, Ts...>(entities);
+template< typename... Ts
+        , typename R
+        , std::enable_if_t<detail::IsEntityRange<R>>* = nullptr>
+auto filter(const R& entities) {
+  return EntityFilter<
+    std::add_lvalue_reference_t<std::add_const_t<R>>, Ts...>(entities);
 }
 
 } // namespace secs
