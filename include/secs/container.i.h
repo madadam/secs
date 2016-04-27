@@ -105,8 +105,10 @@ secs::Container::connect() {
   using secs::event_handle;
 
   return connect<E>([](auto& event) {
-    if (auto component = event_entity(event).template component<T>()) {
-      event_handle(*component, event);
+    if (auto entity = event_entity(event)) {
+      if (auto component = entity.template component<T>()) {
+        event_handle(*component, event);
+      }
     }
   });
 }

@@ -1,4 +1,4 @@
-#include "secs/container.h"
+#include "secs/container.i.h"
 #include "secs/entity_filter.h"
 #include "secs/entity_view.h"
 
